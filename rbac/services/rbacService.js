@@ -23,9 +23,9 @@ class RbacService {
   }
 
   async crearUsuario(body) {
-    const { email, nombre, rol_id, estado } = body
-    if (!email || !nombre || !rol_id)
-      throw Object.assign(new Error('Faltan campos obligatorios: email, nombre, rol_id'), { status: 400 })
+    const { email, nombre, rol_id, estado, password } = body
+    if (!email || !nombre || !rol_id || !password)
+      throw Object.assign(new Error('Faltan campos obligatorios: email, nombre, rol_id, password'), { status: 400 })
 
     const nameErr = validateUserName(nombre, 'nombre')
     if (nameErr) throw Object.assign(new Error(nameErr), { status: 400 })
@@ -42,16 +42,39 @@ class RbacService {
     if (existing)
       throw Object.assign(new Error('Ya existe un usuario registrado con este email.'), { status: 409 })
 
+    // Crear el auth user en Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email: email.trim().toLowerCase(),
+      password,
+      email_confirm: true,
+    })
+    if (authError) throw Object.assign(new Error(authError.message), { status: 400 })
+
+    const authUserId = authData.user.id
+
+    // Insertar en la tabla usuarios linkeando el auth user
     const { data, error } = await supabase
       .from('usuarios')
-      .insert([{ email: email.trim().toLowerCase(), nombre: nombre.trim(), rol_id, estado: estado || 'Activo' }])
+      .insert([{
+        email: email.trim().toLowerCase(),
+        nombre: nombre.trim(),
+        rol_id,
+        estado: estado || 'Activo',
+        auth_user_id: authUserId,
+      }])
       .select('*, roles (id, nombre)')
       .single()
-    if (error) throw error
+
+    if (error) {
+      // Revertir el auth user si falla la inserción en la tabla
+      await supabase.auth.admin.deleteUser(authUserId)
+      throw error
+    }
+
     return data
   }
 
-  async actualizarUsuario(id, body, requesterId = null) {
+  async actualizarUsuario(id, body) {
     const { email, nombre, rol_id, estado } = body
 
     if (nombre !== undefined) {
@@ -81,7 +104,6 @@ class RbacService {
         nombre: nombre?.trim(),
         rol_id,
         estado,
-        updated_by: requesterId,
       })
       .eq('id', id)
       .select('*, roles (id, nombre)')
