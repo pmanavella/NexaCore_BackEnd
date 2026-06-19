@@ -7,6 +7,8 @@ const { requireRole } = require('../../middleware/rbacMiddleware')
 const soloAdmin      = requireRole('Dirección', 'Superadmin')
 const soloSuperadmin = requireRole('Superadmin')
 
+router.get('/perfil',                               ctrl.obtenerPerfil.bind(ctrl))
+
 router.use(authenticate)
 
 router.get('/usuarios',              soloAdmin,      ctrl.listarUsuarios.bind(ctrl))
