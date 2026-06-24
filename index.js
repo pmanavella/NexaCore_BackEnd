@@ -26,6 +26,9 @@ const salariosRoutes = require('./finance/routes/salarios');
 // Finance — Suscripciones
 const suscripcionesRoutes = require('./finance/routes/suscripciones');
 
+// Finance — Migración de datos históricos
+const migracionRoutes = require('./finance/routes/migracion');
+
 // RBAC
 const rbacRoutes = require('./rbac/routes/rbac');
 
@@ -74,6 +77,9 @@ app.use('/api/finance/salarios', salariosRoutes);
 
 // ── Suscripciones ─────────────────────────────────────
 app.use('/api/finance/suscripciones', suscripcionesRoutes);
+
+// ── Migración de datos históricos ─────────────────────
+app.use('/api/finance/migracion', migracionRoutes);
 
 // ── RBAC ──────────────────────────────────────────────
 app.use('/api/rbac', rbacRoutes);
