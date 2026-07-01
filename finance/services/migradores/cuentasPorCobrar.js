@@ -1,4 +1,4 @@
-const { parseBuffer, toNumber } = require('./migradorUtils');
+const { parseBuffer, toNumber, toMoney } = require('./migradorUtils');
 
 // Columnas esperadas (normalizadas): nombre, cantidad, costo_total, concepto
 // Destino: tabla cuentas_por_cobrar (pendientes de cobro — NO ingresos realizados)
@@ -9,7 +9,7 @@ function validarFila(fila, num) {
   if (!fila.nombre || String(fila.nombre).trim() === '')
     errores.push({ fila: num, campo: 'nombre', motivo: 'El nombre del cliente es requerido' });
 
-  const monto = toNumber(fila.costo_total);
+  const monto = toMoney(fila.costo_total);
   if (monto === null)
     errores.push({ fila: num, campo: 'costo_total', motivo: 'El campo "Costo Total" es requerido y debe ser un número' });
   else if (monto <= 0)
@@ -23,7 +23,7 @@ function mapearFila(fila, num) {
     nombre_cliente: String(fila.nombre || '').trim(),
     cantidad: toNumber(fila.cantidad),
     concepto: fila.concepto ? String(fila.concepto).trim() : null,
-    monto_total: toNumber(fila.costo_total),
+    monto_total: toMoney(fila.costo_total),
     estado: 'pendiente',
     origen_migracion: 'excel',
     _fila: num,

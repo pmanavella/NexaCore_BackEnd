@@ -1,14 +1,15 @@
 const supabase = require('../../config/supabase');
 const gastosHistoricos = require('./migradores/gastosHistoricos');
 const comprasInternacionales = require('./migradores/comprasInternacionales');
-const sueldosHistoricos = require('./migradores/sueldosHistoricos');
 const cuentasPorCobrar = require('./migradores/cuentasPorCobrar');
 const totalesFinancieros = require('./migradores/totalesFinancieros');
+
+// Tipos deshabilitados: se rechazan explícitamente con error claro
+const TIPOS_DESHABILITADOS = new Set(['SUELDOS_HISTORICOS']);
 
 const MIGRADORES = {
   GASTOS_HISTORICOS: gastosHistoricos,
   COMPRAS_INTERNACIONALES: comprasInternacionales,
-  SUELDOS_HISTORICOS: sueldosHistoricos,
   CUENTAS_POR_COBRAR: cuentasPorCobrar,
   TOTALES_FINANCIEROS: totalesFinancieros,
 };
@@ -17,7 +18,6 @@ const MIGRADORES = {
 const TABLA_DESTINO = {
   GASTOS_HISTORICOS: 'movimientos',
   COMPRAS_INTERNACIONALES: 'inversiones_historicas',
-  SUELDOS_HISTORICOS: 'sueldos_historicos',
   CUENTAS_POR_COBRAR: 'cuentas_por_cobrar',
   TOTALES_FINANCIEROS: 'conciliaciones_migracion',
 };
@@ -42,15 +42,6 @@ const TIPOS_INFO = [
     destino: 'inversiones_historicas',
   },
   {
-    id: 'SUELDOS_HISTORICOS',
-    label: 'Sueldos Históricos',
-    descripcion: 'Planilla de sueldos consolidados por mes. Columnas: Mes, Fijo USD, Fijo Pesos, Pasantes, Polo Pasan, Por Hora, Total Pesos, Total USD.',
-    columnas_esperadas: ['Mes', 'Total Pesos o Total USD'],
-    columnas_opcionales: ['Fijo USD', 'Fijo Pesos', 'Pasantes', 'Polo Pasan', 'Por Hora'],
-    requiere_fecha_global: false,
-    destino: 'sueldos_historicos',
-  },
-  {
     id: 'CUENTAS_POR_COBRAR',
     label: 'Cuentas por Cobrar',
     descripcion: 'Planilla de deudores pendientes. Columnas: Nombre, Cantidad, Costo Total, Concepto.',
@@ -70,6 +61,25 @@ const TIPOS_INFO = [
   },
 ];
 
+// Etiquetas legibles para los campos internos que usan los migradores
+const CAMPO_LABELS = {
+  'total':                       'Total',
+  'nombre':                      'Nombre',
+  'costo_total':                 'Costo Total',
+  'total_usd':                   'Total USD',
+  'total_pesos':                 'Total Pesos',
+  'total_usd / total_pesos':     'Total USD / Total Pesos',
+  'nombre/descripcion/concepto': 'Nombre / Descripción / Concepto',
+};
+
+function normalizarErrores(errores) {
+  return errores.map(e => ({
+    row:     e.fila    ?? e.row    ?? null,
+    field:   CAMPO_LABELS[e.campo] ?? e.campo ?? e.field ?? null,
+    message: e.motivo  ?? e.message ?? 'Error desconocido',
+  }));
+}
+
 class MigracionService {
   listarTipos() {
     return { tipos: TIPOS_INFO };
@@ -77,28 +87,51 @@ class MigracionService {
 
   // Preview sin writes: parsea, valida y devuelve muestra de las primeras filas
   async preview(buffer, { tipo_migracion, ...params }) {
+    if (TIPOS_DESHABILITADOS.has(tipo_migracion))
+      throw Object.assign(new Error(`Tipo de migración no soportado: "${tipo_migracion}"`), { status: 400 });
+
     const migrador = MIGRADORES[tipo_migracion];
     if (!migrador)
       throw Object.assign(new Error(`Tipo de migración desconocido: "${tipo_migracion}". Opciones: ${Object.keys(MIGRADORES).join(', ')}`), { status: 400 });
 
     const resultado = migrador.procesar(buffer, params);
 
-    return {
+    // Los migradores pueden exponer preview_rows (filas individuales planas) para una
+    // representación consistente en el frontend sin afectar el registro consolidado de insert.
+    const filasParaPreview = resultado.preview_rows ?? resultado.registros;
+    const preview = filasParaPreview.slice(0, 10).map(r => {
+      const { _fila, ...datos } = r;
+      return { fila: _fila, ...datos };
+    });
+
+    const respuesta = {
       tipo_migracion,
       destino: TABLA_DESTINO[tipo_migracion],
       filas_total: resultado.filas_total,
-      registros_validos: resultado.registros.length,
+      registros_validos: resultado.preview_rows
+        ? resultado.filas_total
+        : resultado.registros.length,
       registros_rechazados: resultado.errores.length,
-      errores: resultado.errores,
-      preview: resultado.registros.slice(0, 10).map(r => {
-        const { _fila, ...datos } = r;
-        return { fila: _fila, ...datos };
-      }),
+      errores: normalizarErrores(resultado.errores),
+      preview,
     };
+
+    // Metadata adicional expuesta por migradores que lo soportan (ej. TOTALES_FINANCIEROS)
+    if (resultado.columnas_detectadas !== undefined)
+      respuesta.columnas_detectadas = resultado.columnas_detectadas;
+    if (resultado.columnas_conocidas_presentes !== undefined)
+      respuesta.columnas_conocidas_presentes = resultado.columnas_conocidas_presentes;
+    if (resultado.totales_calculados !== undefined)
+      respuesta.totales_calculados = resultado.totales_calculados;
+
+    return respuesta;
   }
 
   // Confirmar: crea batch + inserta registros válidos en la tabla destino
   async confirmar(buffer, { tipo_migracion, nombre_archivo, usuario_id, created_by, ...params }) {
+    if (TIPOS_DESHABILITADOS.has(tipo_migracion))
+      throw Object.assign(new Error(`Tipo de migración no soportado: "${tipo_migracion}"`), { status: 400 });
+
     const migrador = MIGRADORES[tipo_migracion];
     if (!migrador)
       throw Object.assign(new Error(`Tipo de migración desconocido: "${tipo_migracion}"`), { status: 400 });

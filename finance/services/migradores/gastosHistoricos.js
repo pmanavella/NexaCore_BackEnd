@@ -1,11 +1,11 @@
-const { parsearFecha, mapearCategoria, parseBuffer, toNumber } = require('./migradorUtils');
+const { parsearFecha, mapearCategoria, parseBuffer, toNumber, toMoney, CATEGORIAS_VALIDAS } = require('./migradorUtils');
 
 // Columnas esperadas (normalizadas): nombre, cantidad, concepto, descripcion, total, entregado
 // Destino: tabla movimientos (tipo=Gasto)
 
 function validarFila(fila, num) {
   const errores = [];
-  const monto = toNumber(fila.total);
+  const monto = toMoney(fila.total);
   if (monto === null)
     errores.push({ fila: num, campo: 'total', motivo: 'El campo "Total" es requerido y debe ser un número' });
   else if (monto <= 0)
@@ -17,10 +17,15 @@ function validarFila(fila, num) {
   return errores;
 }
 
+function resolverCategoria(fila) {
+  const candidato = mapearCategoria(fila.concepto || fila.categoria);
+  return CATEGORIAS_VALIDAS.includes(candidato) ? candidato : 'Otros';
+}
+
 function mapearFila(fila, num, fecha) {
   const descripcion = String(fila.descripcion || fila.concepto || fila.nombre || '').trim() || 'Sin descripción';
-  const categoria = mapearCategoria(fila.concepto || fila.categoria);
-  const monto = toNumber(fila.total);
+  const categoria = resolverCategoria(fila);
+  const monto = toMoney(fila.total);
 
   const notasParts = [];
   if (fila.cantidad != null) notasParts.push(`Cantidad: ${fila.cantidad}`);

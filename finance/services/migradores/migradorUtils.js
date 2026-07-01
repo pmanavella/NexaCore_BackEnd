@@ -53,6 +53,8 @@ function parseBuffer(buffer) {
       const key = k.toLowerCase().trim()
         .replace(/\s+/g, '_')
         .replace(/[áàä]/g, 'a').replace(/[éèë]/g, 'e').replace(/[íìï]/g, 'i').replace(/[óòö]/g, 'o').replace(/[úùü]/g, 'u')
+        .replace(/u\$s/g, 'usd')  // "U$S" → "usd"
+        .replace(/us\$/g, 'usd')  // "US$" → "usd"
         .replace(/[^a-z0-9_]/g, '');
       normalized[key] = row[k];
     });
@@ -68,4 +70,10 @@ function toNumber(val) {
   return isNaN(n) ? null : n;
 }
 
-module.exports = { parsearFecha, mapearCategoria, parseBuffer, toNumber, CATEGORIAS_VALIDAS };
+// Convierte a importe monetario redondeado a 2 decimales
+function toMoney(val) {
+  const n = toNumber(val);
+  return n === null ? null : Math.round(n * 100) / 100;
+}
+
+module.exports = { parsearFecha, mapearCategoria, parseBuffer, toNumber, toMoney, CATEGORIAS_VALIDAS };
