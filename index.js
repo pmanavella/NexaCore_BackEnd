@@ -36,6 +36,9 @@ const rbacRoutes = require('./rbac/routes/rbac');
 const organizacionRoutes = require('./organization/routes/organizacion');
 const organizacionService = require('./organization/services/organizacionService');
 
+// Protocolos
+const protocolosRoutes = require('./protocolos/routes/protocolosRoutes');
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -86,6 +89,9 @@ app.use('/api/rbac', rbacRoutes);
 
 // ── Organization ───────────────────────────────────────
 app.use('/api/organizacion', organizacionRoutes);
+
+// ── Protocolos ─────────────────────────────────────────
+app.use('/api/protocolos', protocolosRoutes);
 
 // Health check (público — sin auth)
 app.get('/api/health', (req, res) => {
