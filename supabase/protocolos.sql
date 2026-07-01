@@ -49,6 +49,8 @@ create table if not exists public.protocolo_pruebas (
   fecha         date not null default current_date,
   resultados    jsonb not null,
   observaciones text,
+  constraint protocolo_pruebas_observaciones_len
+    check (char_length(coalesce(observaciones, '')) <= 300),
   created_at    timestamp with time zone default now(),
   created_by    text
 );
@@ -61,8 +63,8 @@ create index if not exists idx_protocolo_pruebas_protocolo_id
 --   {
 --     "item_id": "uuid",
 --     "texto": "Verificar carga de batería",
---     "estado": "ok",   -- 'ok' | 'fail' | 'na'
---     "nota": "Sin observaciones"
+--     "estado": "ok"    -- 'ok' | 'fail' | 'na'
+--     -- el campo "nota" es opcional y por compatibilidad; no es obligatorio
 --   }
 -- ]
 

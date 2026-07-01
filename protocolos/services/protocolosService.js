@@ -126,8 +126,8 @@ class ProtocolosService {
 
   // ── PRUEBAS ────────────────────────────────────────────────
 
-  async registrarPrueba(protocoloId, body, userId) {
-    const { realizado_por, fecha, resultados, observaciones } = body;
+  async registrarPrueba(protocoloId, body, user) {
+    const { fecha, resultados, observaciones } = body;
 
     const { data: protocolo } = await supabase
       .from('protocolos')
@@ -146,15 +146,21 @@ class ProtocolosService {
         throw Object.assign(new Error(`Estado inválido: ${r.estado}. Valores permitidos: ${ESTADOS_VALIDOS.join(', ')}`), { status: 400 });
     }
 
+    const obs = observaciones?.trim() || null;
+    if (obs && obs.length > 300)
+      throw Object.assign(new Error('El campo observaciones no puede superar los 300 caracteres'), { status: 400 });
+
+    const realizado_por = user?.name || user?.email || 'Usuario no identificado';
+
     const { data, error } = await supabase
       .from('protocolo_pruebas')
       .insert([{
         protocolo_id: protocoloId,
-        realizado_por: realizado_por?.trim() || null,
+        realizado_por,
         fecha: fecha || new Date().toISOString().split('T')[0],
         resultados,
-        observaciones: observaciones?.trim() || null,
-        created_by: userId || null,
+        observaciones: obs,
+        created_by: user?.id || null,
       }])
       .select()
       .single();

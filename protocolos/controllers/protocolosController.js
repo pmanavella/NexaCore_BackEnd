@@ -51,7 +51,7 @@ class ProtocolosController {
 
   async registrarPrueba(req, res, next) {
     try {
-      const data = await protocolosService.registrarPrueba(req.params.id, req.body, req.user?.id);
+      const data = await protocolosService.registrarPrueba(req.params.id, req.body, req.user);
       res.status(201).json(data);
     } catch (err) { next(err); }
   }
