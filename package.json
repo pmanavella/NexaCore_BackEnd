@@ -4,8 +4,8 @@
   "description": "Backend API para NexaCore — Sistema de gestión integral",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "NODE_ENV=production node index.js",
+    "dev": "NODE_ENV=development nodemon index.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
