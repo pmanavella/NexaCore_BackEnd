@@ -17,3 +17,7 @@ build/
 # Logs
 *.log
 .claude/
+
+schema_prod.sql
+supabase/.temp/
+.env
