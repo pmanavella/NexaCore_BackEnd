@@ -16,6 +16,9 @@ router.post('/organigrama',         soloSuperadmin,  ctrl.crearNodo.bind(ctrl))
 router.put('/organigrama/:id',      soloAdmin,       ctrl.actualizarNodo.bind(ctrl))
 router.delete('/organigrama/:id',   soloSuperadmin,  ctrl.eliminarNodo.bind(ctrl))
 
+// ── Personas asignables (usuarios y/o empleados sin nodo activo) ─
+router.get('/personas-asignables', soloAdmin, ctrl.obtenerPersonasAsignables.bind(ctrl))
+
 // ── Permisos por usuario ──────────────────────────────────────
 router.get('/permisos/:usuarioId',  soloAdmin,       ctrl.obtenerPermisosUsuario.bind(ctrl))
 router.put('/permisos/:usuarioId',  soloSuperadmin,  ctrl.actualizarPermisosUsuario.bind(ctrl))
