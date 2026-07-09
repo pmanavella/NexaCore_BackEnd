@@ -57,13 +57,50 @@ class ComprobantesService {
       }
     }
 
-    const proveedorPatterns = [
-      /(?:razón social|empresa|proveedor|emisor|nombre)\s*:?\s*([A-ZÁÉÍÓÚa-záéíóú\s.]{3,40})/i,
-      /^([A-ZÁÉÍÓÚ][A-Za-záéíóúñÑ\s.]{5,40})$/m,
+    const proveedorStopWords = [
+      'INFORMACION DEL CLIENTE', 'INFORMACIÓN DEL CLIENTE', 'CONDICIONES DE VENTA',
+      'CLIENTE:', 'DIRECCION:', 'DIRECCIÓN:', 'CUIT:', 'IVA RESPONSABLE',
+      'FACTURA', 'CAE', 'TELEFONO:', 'TELÉFONO:', 'EMAIL:', 'IIBB:',
     ];
-    for (const p of proveedorPatterns) {
-      const match = texto.match(p);
-      if (match) { resultado.proveedor = match[1].trim().substring(0, 100); break; }
+    const cortarEnEncabezado = (str) => {
+      const upper = str.toUpperCase();
+      let corte = str.length;
+      for (const stop of proveedorStopWords) {
+        const idx = upper.indexOf(stop);
+        if (idx !== -1 && idx < corte) corte = idx;
+      }
+      return str.substring(0, corte).trim();
+    };
+
+    // Membrete: primera línea "limpia" del documento (nombre de empresa sin
+    // dígitos ni etiquetas). Suele ser el proveedor real, y tiene prioridad
+    // porque "Razón social:" a veces describe al cliente, no al emisor.
+    const primeraLinea = (texto.split('\n').map(l => l.trim()).find(l => l.length > 0)) || '';
+    const esMembreteLimpio = /^[A-ZÁÉÍÓÚ][A-Za-záéíóúñÑ0-9\s.&-]{1,59}$/.test(primeraLinea);
+    if (esMembreteLimpio) resultado.proveedor = primeraLinea.substring(0, 100);
+
+    if (!resultado.proveedor) {
+      const proveedorPatterns = [
+        // "Razón social:" — se descarta si pertenece al bloque del cliente
+        // (reconocible porque ahí le sigue "Documento:", ej. plantillas AFIP
+        // donde el emisor no repite su nombre bajo esa etiqueta).
+        { regex: /razón social\s*:?\s*([A-ZÁÉÍÓÚa-záéíóú\s.]{3,150})/i, esRazonSocial: true },
+        { regex: /(?:empresa|proveedor|emisor|nombre)\s*:?\s*([A-ZÁÉÍÓÚa-záéíóú\s.]{3,150})/i },
+        { regex: /([A-ZÁÉÍÓÚ][A-Za-záéíóúñÑ\s.]{3,150}?)\s*(?:Dirección|Direccion)\s*:/i },
+        { regex: /^([A-ZÁÉÍÓÚ][A-Za-záéíóúñÑ\s.]{5,150})$/m },
+      ];
+      for (const { regex, esRazonSocial } of proveedorPatterns) {
+        const match = texto.match(regex);
+        if (!match) continue;
+        if (esRazonSocial) {
+          // Ventana desde el inicio del match (incluye lo ya capturado, por si
+          // "Documento" quedó absorbido dentro del grupo) hasta 40 chars después.
+          const ventana = texto.substring(match.index, match.index + match[0].length + 40);
+          if (/documento\s*:/i.test(ventana)) continue;
+        }
+        const cortado = cortarEnEncabezado(match[1]);
+        if (cortado.length >= 3) { resultado.proveedor = cortado.substring(0, 100); break; }
+      }
     }
 
     return resultado;

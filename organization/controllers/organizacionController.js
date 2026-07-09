@@ -34,6 +34,15 @@ class OrganizacionController {
     } catch (err) { next(err) }
   }
 
+  // ── PERSONAS ASIGNABLES ──────────────────────────────────────
+
+  async obtenerPersonasAsignables(req, res, next) {
+    try {
+      const data = await organizacionService.obtenerPersonasAsignables()
+      res.json({ data })
+    } catch (err) { next(err) }
+  }
+
   // ── PERMISOS POR USUARIO ─────────────────────────────────────
 
   async obtenerPermisosUsuario(req, res, next) {

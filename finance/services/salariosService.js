@@ -1,5 +1,27 @@
 const supabase = require('../../config/supabase')
 
+// Normaliza contacto opcional: "", "   " o undefined pasan a null.
+// Evita que valores vacíos choquen contra los índices únicos parciales de email/teléfono.
+function normalizarContacto(valor) {
+  if (valor === undefined || valor === null) return null
+  const trimmed = String(valor).trim()
+  return trimmed === '' ? null : trimmed
+}
+
+// Traduce violaciones de unicidad de Postgres (23505) a mensajes claros para el frontend,
+// en vez de exponer el detalle técnico del constraint/índice.
+function mapearErrorDuplicado(error) {
+  if (error?.code !== '23505') return null
+  const detalle = `${error.message || ''} ${error.details || ''}`.toLowerCase()
+  if (detalle.includes('email')) {
+    return Object.assign(new Error('Ya existe un empleado registrado con ese email.'), { status: 409 })
+  }
+  if (detalle.includes('telefono')) {
+    return Object.assign(new Error('Ya existe un empleado registrado con ese teléfono.'), { status: 409 })
+  }
+  return Object.assign(new Error('El registro ya existe.'), { status: 409 })
+}
+
 class SalariosService {
   // ── Empleados ────────────────────────────────────────────────
 
@@ -52,7 +74,9 @@ class SalariosService {
     const { data, error } = await supabase
       .from('empleados')
       .insert([{
-        nombre, apellido, email, telefono,
+        nombre, apellido,
+        email: normalizarContacto(email),
+        telefono: normalizarContacto(telefono),
         tipo_permanencia,
         modalidad_trabajo: modalidadDerived,
         fecha_ingreso,
@@ -67,7 +91,7 @@ class SalariosService {
       }])
       .select()
       .single()
-    if (error) throw error
+    if (error) throw mapearErrorDuplicado(error) || error
     return data
   }
 
@@ -89,7 +113,9 @@ class SalariosService {
     }
 
     const updates = {
-      nombre, apellido, email, telefono,
+      nombre, apellido,
+      email: normalizarContacto(email),
+      telefono: normalizarContacto(telefono),
       tipo_permanencia, fecha_ingreso, estado,
       modalidad_trabajo: { mensual: 'Mensual', hora: 'Por Horas', turno: 'Por Turno' }[tipoSalarioFinal],
       tipo_salario: tipoSalarioFinal,
@@ -107,13 +133,45 @@ class SalariosService {
       .eq('id', id)
       .select()
       .single()
-    if (error) throw error
+    if (error) throw mapearErrorDuplicado(error) || error
     return data
   }
 
   async eliminarEmpleado(id) {
+    // Un empleado que integra (o integró) el organigrama no se borra físicamente:
+    // se preserva para trazabilidad histórica y solo se desactiva. La FK
+    // organigrama_empleado_id_fkey (ON DELETE RESTRICT) refuerza esto en la base.
+    const { data: nodos, error: nodoErr } = await supabase
+      .from('organigrama')
+      .select('id')
+      .eq('empleado_id', id)
+      .limit(1)
+    if (nodoErr) throw nodoErr
+
+    if (nodos?.length) {
+      const { data, error } = await supabase
+        .from('empleados')
+        .update({ estado: 'Inactivo' })
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return {
+        message: 'El empleado forma parte del organigrama y no puede eliminarse físicamente: se marcó como Inactivo.',
+        data,
+      }
+    }
+
     const { error } = await supabase.from('empleados').delete().eq('id', id)
-    if (error) throw error
+    if (error) {
+      if (error.code === '23503') {
+        throw Object.assign(
+          new Error('No se puede eliminar: el empleado está vinculado al organigrama. Se recomienda marcarlo como Inactivo.'),
+          { status: 409 }
+        )
+      }
+      throw error
+    }
     return { message: 'Empleado eliminado correctamente' }
   }
 
