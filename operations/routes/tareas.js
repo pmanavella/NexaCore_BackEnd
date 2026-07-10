@@ -2,11 +2,12 @@ const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/operationsController');
 const { authenticate } = require('../../middleware/authMiddleware');
+const { requireModuleAccess } = require('../../middleware/rbacMiddleware');
 
 router.use(authenticate);
 
 // Rutas fijas ANTES de /:id
-router.get('/metricas',                ctrl.metricas.bind(ctrl));
+router.get('/metricas',                requireModuleAccess('operations', 'Operativo'), ctrl.metricas.bind(ctrl));
 router.get('/propuestas',              ctrl.listarPropuestas.bind(ctrl));
 router.post('/propuestas/:id/aprobar',  ctrl.aprobarPropuesta.bind(ctrl));
 router.post('/propuestas/:id/rechazar', ctrl.rechazarPropuesta.bind(ctrl));

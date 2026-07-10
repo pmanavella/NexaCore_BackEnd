@@ -1,4 +1,5 @@
 const supabase = require('../../config/supabase');
+const { resolverPeriodo, rangoMes } = require('../../utils/periodo');
 
 class CrmService {
   async listarContactos({ tipo, estado, search } = {}) {
@@ -46,8 +47,21 @@ class CrmService {
     return { message: 'Contacto eliminado correctamente' };
   }
 
-  async getMetricas() {
-    const { data, error } = await supabase.from('contactos').select('tipo, estado');
+  // mes/anio son opcionales: si no llegan, se mantiene el comportamiento histórico
+  // (métricas sobre todos los contactos, sin filtrar por fecha).
+  async getMetricas({ mes, anio } = {}) {
+    let query = supabase.from('contactos').select('tipo, estado');
+
+    const periodoProvisto = (mes ?? '') !== '' || (anio ?? '') !== '';
+    if (periodoProvisto) {
+      const { mes: targetMes, anio: targetAnio } = resolverPeriodo(mes, anio);
+      const { desde, hasta } = rangoMes(targetMes, targetAnio);
+      // contactos.created_at es timestamptz: se ancla explícitamente a UTC para no depender
+      // de la zona horaria de la sesión.
+      query = query.gte('created_at', `${desde}T00:00:00.000Z`).lt('created_at', `${hasta}T00:00:00.000Z`);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
     const total = data.length;
     const clientes = data.filter(c => c.tipo === 'Cliente').length;

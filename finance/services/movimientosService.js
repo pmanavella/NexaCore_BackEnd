@@ -1,4 +1,5 @@
 const supabase = require('../../config/supabase');
+const { resolverPeriodo, rangoMes, mesAnterior } = require('../../utils/periodo');
 
 const TIPOS_VALIDOS = ['Ingreso', 'Gasto'];
 const CATEGORIAS_VALIDAS = ['Tecnología', 'RRHH', 'Insumos', 'Servicios', 'Inversión', 'Otros', 'Suscripción'];
@@ -22,25 +23,17 @@ class MovimientosService {
   }
 
   async obtenerMetricas({ mes, anio } = {}) {
-    const now = new Date();
-    const targetMes = parseInt(mes) || now.getMonth() + 1;
-    const targetAnio = parseInt(anio) || now.getFullYear();
+    const { mes: targetMes, anio: targetAnio } = resolverPeriodo(mes, anio);
+    const { desde: firstDay, hasta: nextMonthFirstDay } = rangoMes(targetMes, targetAnio);
 
-    const firstDay = `${targetAnio}-${String(targetMes).padStart(2, '0')}-01`;
-    const lastDay = new Date(targetAnio, targetMes, 0);
-    const lastDayStr = `${targetAnio}-${String(targetMes).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`;
+    const { mes: prevMes, anio: prevAnio } = mesAnterior(targetMes, targetAnio);
+    const { desde: prevFirst, hasta: prevNextFirstDay } = rangoMes(prevMes, prevAnio);
 
-    const prevMes = targetMes === 1 ? 12 : targetMes - 1;
-    const prevAnio = targetMes === 1 ? targetAnio - 1 : targetAnio;
-    const prevFirst = `${prevAnio}-${String(prevMes).padStart(2, '0')}-01`;
-    const prevLast = new Date(prevAnio, prevMes, 0);
-    const prevLastStr = `${prevAnio}-${String(prevMes).padStart(2, '0')}-${String(prevLast.getDate()).padStart(2, '0')}`;
-
-    const [{ data: mesActual }, { data: mesAnterior }, { count: pendientesOCR }, { data: porCategoria }] = await Promise.all([
-      supabase.from('movimientos').select('tipo, monto').gte('fecha', firstDay).lte('fecha', lastDayStr),
-      supabase.from('movimientos').select('tipo, monto').gte('fecha', prevFirst).lte('fecha', prevLastStr),
+    const [{ data: mesActual }, { data: mesAnteriorData }, { count: pendientesOCR }, { data: porCategoria }] = await Promise.all([
+      supabase.from('movimientos').select('tipo, monto').gte('fecha', firstDay).lt('fecha', nextMonthFirstDay),
+      supabase.from('movimientos').select('tipo, monto').gte('fecha', prevFirst).lt('fecha', prevNextFirstDay),
       supabase.from('comprobantes').select('id', { count: 'exact' }).eq('ocr_estado', 'pendiente'),
-      supabase.from('movimientos').select('categoria, monto').eq('tipo', 'Gasto').gte('fecha', firstDay).lte('fecha', lastDayStr),
+      supabase.from('movimientos').select('categoria, monto').eq('tipo', 'Gasto').gte('fecha', firstDay).lt('fecha', nextMonthFirstDay),
     ]);
 
     const calcTotales = (arr) => {
@@ -53,7 +46,7 @@ class MovimientosService {
     };
 
     const actual = calcTotales(mesActual);
-    const anterior = calcTotales(mesAnterior);
+    const anterior = calcTotales(mesAnteriorData);
 
     const categoriaMap = {};
     if (porCategoria) {

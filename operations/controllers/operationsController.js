@@ -5,7 +5,7 @@ class OperationsController {
     try { res.json(await operationsService.listarTareas(req.query)); } catch (err) { next(err); }
   }
   async metricas(req, res, next) {
-    try { res.json(await operationsService.getMetricas()); } catch (err) { next(err); }
+    try { res.json(await operationsService.getMetricas(req.query)); } catch (err) { next(err); }
   }
   async crearTarea(req, res, next) {
     try { res.status(201).json(await operationsService.crearTarea(req.body)); } catch (err) { next(err); }
