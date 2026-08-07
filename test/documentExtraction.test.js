@@ -128,7 +128,7 @@ test('carga, firma el archivo y crea el movimiento al pasar todas las validacion
     })
   };
   supabase.from = table => {
-    if (table === 'comprobante_items') return { insert: async values => { rows.comprobante_items.push(...values); return { error: null }; } };
+    if (table === 'comprobante_items') return { insert: values => { rows.comprobante_items.push(...values); return { select: async () => ({ data: values, error: null }) }; } };
     return {
       select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }),
       insert: values => ({ select: () => ({ single: async () => {
