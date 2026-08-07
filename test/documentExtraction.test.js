@@ -19,7 +19,7 @@ function facturaEjemplo() {
     pointOfSale: '0006', documentNumber: '00002845', cae: '6261619010019',
     issueDate: '2026-06-25', currency: 'ARS', subtotal: 50473.74,
     discountsTotal: 2856.99, ivaTotal: 9999.52, otherTaxesTotal: 0, total: 57616.26,
-    items: [{ code: 'A0085', description: 'FUENTE SWITCHING 12V 2A X5', quantity: 2, unitPrice: 25236.87, discount: 0, ivaRate: 21, lineTotal: 50473.74 }],
+    items: [{ code: 'A0085', description: 'FUENTE SWITCHING 12V 2A X5', quantity: 2, unitPrice: 25236.87, discount: 0, ivaRate: 21, lineTotal: 57616.26 }],
     suggestedCategory: 'Tecnología', suggestedTransactionType: 'Gasto', description: 'Compra de fuente switching'
   };
 }
@@ -77,7 +77,7 @@ test('integra Gemini con JSON estructurado y no acepta JSON inválido', async ()
   const previousKey = process.env.GEMINI_API_KEY;
   process.env.GEMINI_API_KEY = 'test-key';
   global.fetch = async (url, options) => {
-    assert.match(url, /gemini-2\.5-flash-lite/);
+    assert.match(url, /gemini-3\.1-flash-lite/);
     const request = JSON.parse(options.body);
     assert.equal(request.generationConfig.responseMimeType, 'application/json');
     assert.ok(request.generationConfig.responseJsonSchema);

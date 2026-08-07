@@ -51,9 +51,10 @@ class ComprobantesService {
       alicuota_iva: item.ivaRate,
       importe: item.lineTotal
     }));
-    if (!rows.length) return;
-    const { error } = await supabase.from('comprobante_items').insert(rows);
+    if (!rows.length) return [];
+    const { data, error } = await supabase.from('comprobante_items').insert(rows).select('*');
     if (error) throw error;
+    return data;
   }
 
   async buscarDuplicado(fingerprint) {
@@ -100,7 +101,7 @@ class ComprobantesService {
       const comprobante = await this.persistir({
         file, storagePath, extraction, estado: 'requiere_revision', diagnostico, duplicateOfId: duplicate.id
       });
-      await this.persistirItems(comprobante.id, extraction.items);
+      comprobante.comprobante_items = await this.persistirItems(comprobante.id, extraction.items);
       return { comprobante: await this.presentar(comprobante), movimiento: null, analysis: diagnostico };
     }
 
@@ -119,10 +120,10 @@ class ComprobantesService {
         diagnostico: { errors: ['El comprobante fue cargado simultáneamente por otro usuario.'], auto_created: false, duplicate_of_id: existing?.id || null },
         duplicateOfId: existing?.id || null
       });
-      await this.persistirItems(duplicateRecord.id, extraction.items);
+      duplicateRecord.comprobante_items = await this.persistirItems(duplicateRecord.id, extraction.items);
       return { comprobante: await this.presentar(duplicateRecord), movimiento: null, analysis: duplicateRecord.diagnostico };
     }
-    await this.persistirItems(comprobante.id, extraction.items);
+    comprobante.comprobante_items = await this.persistirItems(comprobante.id, extraction.items);
 
     if (!validation.valid) {
       return { comprobante: await this.presentar(comprobante), movimiento: null, analysis: diagnostico };

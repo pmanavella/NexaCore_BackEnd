@@ -140,9 +140,9 @@ function validateExtraction(extraction, companyCuit) {
     if (Math.abs(calculatedTotal - extraction.total) > 1) errors.push('El total no concilia con subtotal, descuentos e impuestos.');
   }
 
-  if (extraction.items.length && extraction.subtotal !== null) {
+  if (extraction.items.length && extraction.total !== null) {
     const itemTotal = extraction.items.reduce((sum, item) => sum + (item.lineTotal || 0), 0);
-    if (Math.abs(itemTotal - extraction.subtotal) > 1) errors.push('El subtotal no concilia con los renglones extraídos.');
+    if (Math.abs(itemTotal - extraction.total) > 1) errors.push('El total no concilia con los renglones extraídos.');
   }
 
   let transactionType = null;

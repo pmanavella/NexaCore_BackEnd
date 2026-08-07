@@ -1,6 +1,6 @@
 const { EXTRACTION_JSON_SCHEMA, normalizeExtraction } = require('./documentExtraction');
 
-const MODEL = 'gemini-2.5-flash-lite';
+const MODEL = 'gemini-3.1-flash-lite';
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
 const INSTRUCTION = `Extraé datos de un comprobante financiero argentino. Respondé exclusivamente el JSON definido por el esquema. No inventes: usá null cuando un dato no esté visible. Normalizá fechas como YYYY-MM-DD, importes como números sin símbolo ni separadores, CUIT con 11 dígitos y moneda ISO. documentType solo puede ser factura_a, factura_b, factura_c, ticket u otro. suggestedCategory solo puede ser Tecnología, RRHH, Insumos, Servicios, Inversión, Otros o Suscripción. suggestedTransactionType debe ser Ingreso o Gasto según la relación entre emisor y receptor. subtotal debe ser el total de renglones antes de descuentos e impuestos; discountsTotal, ivaTotal y otherTaxesTotal deben ser cero si figuran explícitamente como cero.`;
