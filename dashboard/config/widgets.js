@@ -40,6 +40,39 @@ const DASHBOARD_WIDGETS = {
     module: 'planification',
     sourceEndpoint: 'GET /api/planification/proyectos/metricas',
   },
+
+  // Variantes "últimos 6 meses": mismo endpoint que su contraparte mensual —
+  // el frontend arma el agregado pidiendo el endpoint 6 veces (uno por mes) y
+  // sumando client-side. No agregan datos ni lógica nueva en el backend.
+  finanzas_ingresos_6m: {
+    module: 'finance',
+    sourceEndpoint: 'GET /api/finance/movimientos/metricas',
+  },
+  finanzas_gastos_6m: {
+    module: 'finance',
+    sourceEndpoint: 'GET /api/finance/movimientos/metricas',
+  },
+  finanzas_resultado_neto_6m: {
+    module: 'finance',
+    sourceEndpoint: 'GET /api/finance/movimientos/metricas',
+  },
+  finanzas_metricas_movimientos_6m: {
+    module: 'finance',
+    sourceEndpoint: 'GET /api/finance/movimientos/metricas',
+  },
+  finanzas_metricas_salarios_6m: {
+    module: 'finance',
+    sourceEndpoint: 'GET /api/finance/salarios/metricas',
+    requiresRole: ['Dirección', 'Superadmin'],
+  },
+  crm_metricas_contactos_6m: {
+    module: 'crm',
+    sourceEndpoint: 'GET /api/crm/contactos/metricas',
+  },
+  operativo_metricas_tareas_6m: {
+    module: 'operations',
+    sourceEndpoint: 'GET /api/operations/tareas/metricas',
+  },
 };
 
 module.exports = { DASHBOARD_WIDGETS };

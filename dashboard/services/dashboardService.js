@@ -3,8 +3,31 @@ const organizacionService = require('../../organization/services/organizacionSer
 const { DASHBOARD_WIDGETS } = require('../config/widgets');
 
 const DASHBOARD_NAME = 'Panel General';
+const WIDGET_SIZES = ['sm', 'md', 'lg'];
+const DEFAULT_WIDGET_SIZE = 'sm';
 
 class DashboardService {
+  // Acepta tanto el formato viejo (array de IDs string) como el nuevo
+  // (array de {id, size}), y devuelve siempre [{id, size}] normalizado.
+  // Usado tanto al leer (compatibilidad con filas guardadas en formato viejo)
+  // como al guardar (compatibilidad con clientes viejos que mandan strings).
+  _normalizarWidgets(widgetsInput) {
+    const normalizados = (widgetsInput || [])
+      .map(entry => {
+        const id = typeof entry === 'string' ? entry : entry?.id;
+        if (typeof id !== 'string' || !id) return null;
+        const size = WIDGET_SIZES.includes(entry?.size) ? entry.size : DEFAULT_WIDGET_SIZE;
+        return { id, size };
+      })
+      .filter(Boolean);
+
+    const vistos = new Set();
+    return normalizados.filter(w => {
+      if (vistos.has(w.id)) return false;
+      vistos.add(w.id);
+      return true;
+    });
+  }
   // Módulos (slugs) a los que el usuario tiene acceso real hoy, según la Matriz
   // de permisos (usuario_modulo_permisos > rol_modulo_permisos). Reutiliza
   // organizacionService en vez de reimplementar la precedencia de permisos.
@@ -46,7 +69,8 @@ class DashboardService {
     // Filtra en lectura mosaicos guardados cuyo permiso haya sido revocado desde
     // el último guardado (ej. le sacaron acceso al módulo) — no se los devuelve,
     // pero tampoco se reescribe la fila: el filtro es solo de presentación.
-    const widgets = (config.widgets || []).filter(id => this._widgetPermitido(id, allowedModules, userRole));
+    const widgets = this._normalizarWidgets(config.widgets)
+      .filter(w => this._widgetPermitido(w.id, allowedModules, userRole));
 
     return {
       dashboard: { name: DASHBOARD_NAME, widgets },
@@ -57,14 +81,15 @@ class DashboardService {
 
   async guardarConfiguracion(usuarioId, widgetsInput, userRole) {
     if (!Array.isArray(widgetsInput)) {
-      throw Object.assign(new Error('"widgets" debe ser un array de IDs de mosaico.'), { status: 400 });
+      throw Object.assign(new Error('"widgets" debe ser un array de mosaicos.'), { status: 400 });
     }
 
-    // IDs repetidos: se normalizan quedándose con la primera aparición de cada
-    // uno, preservando el orden enviado (no se rechaza el request por esto).
-    const widgetsUnicos = [...new Set(widgetsInput)];
+    // Acepta tanto [id, id, ...] (formato viejo) como [{id, size}, ...] (nuevo).
+    // IDs repetidos: se quedan con la primera aparición, preservando el orden
+    // enviado (no se rechaza el request por esto).
+    const widgetsUnicos = this._normalizarWidgets(widgetsInput);
 
-    const idsDesconocidos = widgetsUnicos.filter(id => !DASHBOARD_WIDGETS[id]);
+    const idsDesconocidos = widgetsUnicos.filter(w => !DASHBOARD_WIDGETS[w.id]).map(w => w.id);
     if (idsDesconocidos.length > 0) {
       throw Object.assign(
         new Error(`Mosaico(s) desconocido(s): ${idsDesconocidos.join(', ')}.`),
@@ -74,7 +99,7 @@ class DashboardService {
 
     const allowedModules = await this._modulosHabilitados(usuarioId);
 
-    const idsNoAutorizados = widgetsUnicos.filter(id => !this._widgetPermitido(id, allowedModules, userRole));
+    const idsNoAutorizados = widgetsUnicos.filter(w => !this._widgetPermitido(w.id, allowedModules, userRole)).map(w => w.id);
     if (idsNoAutorizados.length > 0) {
       throw Object.assign(
         new Error(`No tenés permisos para agregar el/los mosaico(s): ${idsNoAutorizados.join(', ')}.`),
@@ -93,7 +118,7 @@ class DashboardService {
     if (error) throw error;
 
     return {
-      dashboard: { name: DASHBOARD_NAME, widgets: saved.widgets },
+      dashboard: { name: DASHBOARD_NAME, widgets: this._normalizarWidgets(saved.widgets) },
       allowedModules,
       hasConfiguration: true,
     };
