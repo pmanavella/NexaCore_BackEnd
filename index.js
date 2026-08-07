@@ -41,6 +41,8 @@ const protocolosRoutes = require('./protocolos/routes/protocolosRoutes');
 
 // Dashboard
 const dashboardRoutes = require('./dashboard/routes/dashboard');
+const dashboardOperacionesRoutes = require('./dashboard/routes/dashboardOperacionesRoutes');
+const dashboardViewsRoutes = require('./dashboard/routes/dashboardViewsRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -98,6 +100,8 @@ app.use('/api/protocolos', protocolosRoutes);
 
 // ── Dashboard ──────────────────────────────────────────
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/dashboard', dashboardOperacionesRoutes);
+app.use('/api/dashboard', dashboardViewsRoutes);
 
 // Health check (público — sin auth)
 app.get('/api/health', (req, res) => {
