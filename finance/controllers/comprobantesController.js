@@ -5,7 +5,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    const allowed = ['image/jpeg', 'image/png', 'application/pdf'];
     if (allowed.includes(file.mimetype)) cb(null, true);
     else cb(new Error('Tipo de archivo no permitido. Solo JPG, PNG o PDF.'));
   }
@@ -17,7 +17,7 @@ class ComprobantesController {
   async subir(req, res, next) {
     try {
       if (!req.file) return res.status(400).json({ error: 'No se recibió ningún archivo' });
-      const result = await comprobantesService.subirArchivo(req.file, req.body.movimiento_id);
+      const result = await comprobantesService.subirArchivo(req.file, req.user?.email ?? null);
       res.status(201).json(result);
     } catch (err) { next(err); }
   }
@@ -25,13 +25,6 @@ class ComprobantesController {
   async listar(req, res, next) {
     try {
       const result = await comprobantesService.listar();
-      res.json(result);
-    } catch (err) { next(err); }
-  }
-
-  async vincular(req, res, next) {
-    try {
-      const result = await comprobantesService.vincular(req.params.id, req.body.movimiento_id);
       res.json(result);
     } catch (err) { next(err); }
   }

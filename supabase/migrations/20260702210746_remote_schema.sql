@@ -125,16 +125,15 @@ CREATE TABLE IF NOT EXISTS "public"."comprobantes" (
     "movimiento_id" "uuid",
     "nombre_archivo" "text" NOT NULL,
     "tipo_archivo" "text" NOT NULL,
-    "url_archivo" "text",
     "storage_path" "text",
-    "ocr_estado" "text" DEFAULT 'pendiente'::"text",
-    "ocr_texto" "text",
-    "ocr_fecha" "date",
-    "ocr_monto" numeric(15,2),
-    "ocr_proveedor" "text",
+    "estado_analisis" "text" DEFAULT 'requiere_revision'::"text" NOT NULL,
+    "extraccion" "jsonb",
+    "diagnostico" "jsonb" DEFAULT '{"errors":[],"auto_created":false}'::"jsonb" NOT NULL,
+    "document_fingerprint" "text",
+    "duplicate_of_id" "uuid",
     "created_at" timestamp with time zone DEFAULT "now"(),
-    CONSTRAINT "comprobantes_ocr_estado_check" CHECK (("ocr_estado" = ANY (ARRAY['pendiente'::"text", 'procesado'::"text", 'error'::"text"]))),
-    CONSTRAINT "comprobantes_tipo_archivo_check" CHECK (("tipo_archivo" = ANY (ARRAY['image/jpeg'::"text", 'image/jpg'::"text", 'image/png'::"text", 'application/pdf'::"text"])))
+    CONSTRAINT "comprobantes_estado_analisis_check" CHECK (("estado_analisis" = ANY (ARRAY['procesado'::"text", 'requiere_revision'::"text", 'error'::"text"]))),
+    CONSTRAINT "comprobantes_tipo_archivo_check" CHECK (("tipo_archivo" = ANY (ARRAY['image/jpeg'::"text", 'image/png'::"text", 'application/pdf'::"text"])))
 );
 
 
@@ -1755,8 +1754,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
-
-
 
 
 
