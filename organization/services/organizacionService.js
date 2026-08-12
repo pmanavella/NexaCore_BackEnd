@@ -262,6 +262,39 @@ class OrganizacionService {
     return merged
   }
 
+  // Igual precedencia que obtenerPermisosUsuario (usuario_modulo_permisos > rol_modulo_permisos > sin acceso),
+  // pero resuelve un único módulo por nombre en vez de traer los permisos de todos los módulos.
+  // Usado por el middleware requireModuleAccess para gatear endpoints de negocio.
+  async usuarioTieneAccesoModulo(usuarioId, moduloNombre) {
+    if (!usuarioId) return false
+
+    const [{ data: modulo }, { data: usuario }] = await Promise.all([
+      supabase.from('modulos').select('id').eq('nombre', moduloNombre).single(),
+      supabase.from('usuarios').select('rol_id').eq('id', usuarioId).single(),
+    ])
+    if (!modulo) return false
+
+    const { data: permisoUsuario } = await supabase
+      .from('usuario_modulo_permisos')
+      .select('permiso')
+      .eq('usuario_id', usuarioId)
+      .eq('modulo_id', modulo.id)
+      .maybeSingle()
+
+    if (permisoUsuario) return permisoUsuario.permiso !== 'sin_acceso'
+
+    if (!usuario?.rol_id) return false
+
+    const { data: permisoRol } = await supabase
+      .from('rol_modulo_permisos')
+      .select('puede_ver')
+      .eq('rol_id', usuario.rol_id)
+      .eq('modulo_id', modulo.id)
+      .maybeSingle()
+
+    return !!permisoRol?.puede_ver
+  }
+
   async upsertPermisosUsuario(usuarioId, permisos, requesterId) {
     // Seguridad: nadie puede darse permisos a sí mismo para escalar
     if (requesterId && usuarioId === requesterId) {

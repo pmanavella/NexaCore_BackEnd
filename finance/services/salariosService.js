@@ -1,4 +1,5 @@
 const supabase = require('../../config/supabase')
+const { resolverPeriodo, rangoMes } = require('../../utils/periodo')
 
 // Normaliza contacto opcional: "", "   " o undefined pasan a null.
 // Evita que valores vacíos choquen contra los índices únicos parciales de email/teléfono.
@@ -354,17 +355,13 @@ class SalariosService {
 
   // ── Métricas ─────────────────────────────────────────────────
 
-  async getMetricas() {
-    const now = new Date()
-    const year = now.getFullYear()
-    const month = now.getMonth() + 1
-    const firstDay = `${year}-${String(month).padStart(2, '0')}-01`
-    const lastDay = new Date(year, month, 0)
-    const lastDayStr = `${year}-${String(month).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`
+  async getMetricas({ mes, anio } = {}) {
+    const { mes: targetMes, anio: targetAnio } = resolverPeriodo(mes, anio)
+    const { desde: firstDay, hasta: nextMonthFirstDay } = rangoMes(targetMes, targetAnio)
 
     const [{ count: totalEmpleados }, { data: movMes }] = await Promise.all([
       supabase.from('empleados').select('id', { count: 'exact', head: true }).eq('estado', 'Activo'),
-      supabase.from('movimientos_salario').select('monto, categorias_salariales(nombre)').gte('fecha', firstDay).lte('fecha', lastDayStr),
+      supabase.from('movimientos_salario').select('monto, categorias_salariales(nombre)').gte('fecha', firstDay).lt('fecha', nextMonthFirstDay),
     ])
 
     const totalNomina = movMes

@@ -2,14 +2,15 @@ const express = require('express')
 const router = express.Router()
 const ctrl = require('../controllers/salariosController')
 const { authenticate } = require('../../middleware/authMiddleware')
-const { requireRole } = require('../../middleware/rbacMiddleware')
+const { requireRole, requireModuleAccess } = require('../../middleware/rbacMiddleware')
 
 const soloAdmin = requireRole('Dirección', 'Superadmin')
 
 router.use(authenticate)
 
-// Métricas
-router.get('/metricas', soloAdmin, ctrl.metricas.bind(ctrl))
+// Métricas — mantiene además el check de rol existente (soloAdmin) por tratarse de datos
+// sensibles de nómina, sumado al chequeo de acceso real al módulo Finanzas.
+router.get('/metricas', soloAdmin, requireModuleAccess('finance', 'Finanzas'), ctrl.metricas.bind(ctrl))
 
 // Cotización del dólar
 router.get('/cotizacion-dolar',  soloAdmin, ctrl.getCotizacionDiaria.bind(ctrl))

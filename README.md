@@ -26,6 +26,14 @@ API REST del sistema de gestión empresarial NexaCore, construida con Node.js y 
 | `SUPABASE_URL` | URL del proyecto en Supabase | Sí |
 | `SUPABASE_SERVICE_KEY` | Service Role Key de Supabase (nunca exponer en el cliente) | Sí |
 | `ALLOWED_ORIGINS` | Orígenes permitidos para CORS, separados por coma | Sí |
+| `GEMINI_API_KEY` | Clave paga de Gemini para analizar comprobantes | Sí |
+| `COMPANY_CUIT` | CUIT propio sin guiones, usado para determinar ingreso o gasto | Sí |
+
+## Comprobantes financieros
+
+Los comprobantes se procesan con `gemini-2.5-flash-lite` y se registran automáticamente solo si el documento, los importes y el CUIT propio pasan las validaciones contables. Los casos ambiguos quedan en revisión con un diagnóstico específico.
+
+Antes de desplegar esta versión, aplicar la migración `database/migrations/2026-08-06_reemplazar_ocr_por_gemini.sql`. Esta elimina definitivamente las columnas OCR anteriores, crea los renglones de comprobante y vuelve privado el bucket `comprobantes`.
 
 ---
 

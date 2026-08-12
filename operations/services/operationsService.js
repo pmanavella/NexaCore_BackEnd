@@ -1,4 +1,5 @@
 const supabase = require('../../config/supabase');
+const { resolverPeriodo, rangoMes } = require('../../utils/periodo');
 
 // Campos de la tabla `tareas` que se auditan en tarea_historial.
 // Cualquier cambio en estos campos genera un registro automático.
@@ -152,11 +153,23 @@ class OperationsService {
     return { message: 'Tarea eliminada correctamente' };
   }
 
-  async getMetricas() {
-    const { data, error } = await supabase
+  // mes/anio son opcionales: si no llegan, se mantiene el comportamiento histórico
+  // (métricas sobre todas las tareas, sin filtrar por fecha). Cuando se proveen, filtran
+  // por fecha_limite (vencimiento), que es el campo relevante para el tablero operativo.
+  async getMetricas({ mes, anio } = {}) {
+    let query = supabase
       .from('tareas')
       .select('estado, prioridad, tipo')
       .or('tipo.is.null,tipo.eq.asignacion');
+
+    const periodoProvisto = (mes ?? '') !== '' || (anio ?? '') !== '';
+    if (periodoProvisto) {
+      const { mes: targetMes, anio: targetAnio } = resolverPeriodo(mes, anio);
+      const { desde, hasta } = rangoMes(targetMes, targetAnio);
+      query = query.gte('fecha_limite', desde).lt('fecha_limite', hasta);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
     const total      = data.length;
     const pendientes = data.filter(t => t.estado === 'Pendiente').length;

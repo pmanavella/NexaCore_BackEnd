@@ -1,4 +1,17 @@
 const supabase = require('../../config/supabase');
+const { resolverPeriodo, rangoMes, mesAnterior } = require('../../utils/periodo');
+
+async function adjuntarUrlsFirmadas(movimientos) {
+  return Promise.all((movimientos || []).map(async movimiento => {
+    const comprobantes = await Promise.all((movimiento.comprobantes || []).map(async comprobante => {
+      if (!comprobante.storage_path) return { ...comprobante, archivo_url: null };
+      const { data, error } = await supabase.storage.from('comprobantes').createSignedUrl(comprobante.storage_path, 600);
+      if (error) throw new Error(`No se pudo generar acceso seguro al comprobante: ${error.message}`);
+      return { ...comprobante, archivo_url: data.signedUrl };
+    }));
+    return { ...movimiento, comprobantes };
+  }));
+}
 
 const TIPOS_VALIDOS = ['Ingreso', 'Gasto'];
 const CATEGORIAS_VALIDAS = ['Tecnología', 'RRHH', 'Insumos', 'Servicios', 'Inversión', 'Otros', 'Suscripción'];
@@ -7,7 +20,7 @@ class MovimientosService {
   async listar({ tipo, categoria, fecha_desde, fecha_hasta, search } = {}) {
     let query = supabase
       .from('movimientos')
-      .select('*, comprobantes (id, nombre_archivo, url_archivo, ocr_estado)')
+      .select('*, comprobantes (id, nombre_archivo, storage_path, estado_analisis)')
       .order('fecha', { ascending: false });
 
     if (tipo && tipo !== 'Todos') query = query.eq('tipo', tipo);
@@ -18,29 +31,21 @@ class MovimientosService {
 
     const { data, error } = await query;
     if (error) throw error;
-    return { data, total: data.length };
+    return { data: await adjuntarUrlsFirmadas(data), total: data.length };
   }
 
   async obtenerMetricas({ mes, anio } = {}) {
-    const now = new Date();
-    const targetMes = parseInt(mes) || now.getMonth() + 1;
-    const targetAnio = parseInt(anio) || now.getFullYear();
+    const { mes: targetMes, anio: targetAnio } = resolverPeriodo(mes, anio);
+    const { desde: firstDay, hasta: nextMonthFirstDay } = rangoMes(targetMes, targetAnio);
 
-    const firstDay = `${targetAnio}-${String(targetMes).padStart(2, '0')}-01`;
-    const lastDay = new Date(targetAnio, targetMes, 0);
-    const lastDayStr = `${targetAnio}-${String(targetMes).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`;
+    const { mes: prevMes, anio: prevAnio } = mesAnterior(targetMes, targetAnio);
+    const { desde: prevFirst, hasta: prevNextFirstDay } = rangoMes(prevMes, prevAnio);
 
-    const prevMes = targetMes === 1 ? 12 : targetMes - 1;
-    const prevAnio = targetMes === 1 ? targetAnio - 1 : targetAnio;
-    const prevFirst = `${prevAnio}-${String(prevMes).padStart(2, '0')}-01`;
-    const prevLast = new Date(prevAnio, prevMes, 0);
-    const prevLastStr = `${prevAnio}-${String(prevMes).padStart(2, '0')}-${String(prevLast.getDate()).padStart(2, '0')}`;
-
-    const [{ data: mesActual }, { data: mesAnterior }, { count: pendientesOCR }, { data: porCategoria }] = await Promise.all([
-      supabase.from('movimientos').select('tipo, monto').gte('fecha', firstDay).lte('fecha', lastDayStr),
-      supabase.from('movimientos').select('tipo, monto').gte('fecha', prevFirst).lte('fecha', prevLastStr),
-      supabase.from('comprobantes').select('id', { count: 'exact' }).eq('ocr_estado', 'pendiente'),
-      supabase.from('movimientos').select('categoria, monto').eq('tipo', 'Gasto').gte('fecha', firstDay).lte('fecha', lastDayStr),
+    const [{ data: mesActual }, { data: mesAnteriorData }, { count: comprobantesRevision }, { data: porCategoria }] = await Promise.all([
+      supabase.from('movimientos').select('tipo, monto').gte('fecha', firstDay).lt('fecha', nextMonthFirstDay),
+      supabase.from('movimientos').select('tipo, monto').gte('fecha', prevFirst).lt('fecha', prevNextFirstDay),
+      supabase.from('comprobantes').select('id', { count: 'exact' }).eq('estado_analisis', 'requiere_revision'),
+      supabase.from('movimientos').select('categoria, monto').eq('tipo', 'Gasto').gte('fecha', firstDay).lt('fecha', nextMonthFirstDay),
     ]);
 
     const calcTotales = (arr) => {
@@ -53,7 +58,7 @@ class MovimientosService {
     };
 
     const actual = calcTotales(mesActual);
-    const anterior = calcTotales(mesAnterior);
+    const anterior = calcTotales(mesAnteriorData);
 
     const categoriaMap = {};
     if (porCategoria) {
@@ -72,7 +77,7 @@ class MovimientosService {
       ingresos: actual.ingresos,
       gastos: actual.gastos,
       balance: actual.ingresos - actual.gastos,
-      pendientesOCR: pendientesOCR || 0,
+      comprobantesRevision: comprobantesRevision || 0,
       pctIngreso: Number(pctIngreso),
       pctGasto: Number(pctGasto),
       gastosPorCategoria,
@@ -123,7 +128,8 @@ class MovimientosService {
       .single();
     if (error) throw error;
     if (!data) throw Object.assign(new Error('No encontrado'), { status: 404 });
-    return data;
+    const [presentado] = await adjuntarUrlsFirmadas([data]);
+    return presentado;
   }
 
   async crear(body, email = null) {

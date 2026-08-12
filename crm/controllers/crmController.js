@@ -5,7 +5,7 @@ class CrmController {
     try { res.json(await crmService.listarContactos(req.query)); } catch (err) { next(err); }
   }
   async metricas(req, res, next) {
-    try { res.json(await crmService.getMetricas()); } catch (err) { next(err); }
+    try { res.json(await crmService.getMetricas(req.query)); } catch (err) { next(err); }
   }
   async crearContacto(req, res, next) {
     try { res.status(201).json(await crmService.crearContacto(req.body)); } catch (err) { next(err); }

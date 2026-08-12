@@ -1,180 +1,174 @@
 const supabase = require('../../config/supabase');
-const Tesseract = require('tesseract.js');
-const pdfParse = require('pdf-parse');
+const crypto = require('crypto');
+const movimientosService = require('./movimientosService');
+const { analyzeDocument } = require('./geminiDocumentService');
+const { validateExtraction, hasAllowedSignature } = require('./documentExtraction');
+
+const BUCKET = 'comprobantes';
+const SIGNED_URL_TTL_SECONDS = 60 * 10;
 
 class ComprobantesService {
-  async ocrImagen(buffer) {
-    try {
-      const { data: { text } } = await Tesseract.recognize(buffer, 'spa+eng', { logger: () => {} });
-      return text;
-    } catch (err) {
-      console.error('OCR error:', err.message);
-      return null;
-    }
+  async crearUrlFirmada(storagePath) {
+    if (!storagePath) return null;
+    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS);
+    if (error) throw new Error(`No se pudo generar acceso seguro al comprobante: ${error.message}`);
+    return data.signedUrl;
   }
 
-  async parsePDF(buffer) {
-    try {
-      const data = await pdfParse(buffer);
-      return data.text;
-    } catch (err) {
-      console.error('PDF parse error:', err.message);
-      return null;
-    }
+  async presentar(comprobante) {
+    if (!comprobante) return comprobante;
+    return { ...comprobante, archivo_url: await this.crearUrlFirmada(comprobante.storage_path) };
   }
 
-  extraerDatosOCR(texto) {
-    if (!texto) return { fecha: null, monto: null, proveedor: null };
-    const resultado = { fecha: null, monto: null, proveedor: null };
-
-    const montoPatterns = [
-      /(?:total|importe|monto|precio)\s*:?\s*\$?\s*([\d.,]+)/i,
-      /\$\s*([\d.,]+)/,
-      /(?:ars|pesos)\s*([\d.,]+)/i,
-    ];
-    for (const p of montoPatterns) {
-      const match = texto.match(p);
-      if (match) {
-        const raw = match[1].replace(/\./g, '').replace(',', '.');
-        const val = parseFloat(raw);
-        if (!isNaN(val) && val > 0) { resultado.monto = val; break; }
-      }
-    }
-
-    const fechaPatterns = [/(\d{2})\/(\d{2})\/(\d{4})/, /(\d{4})-(\d{2})-(\d{2})/, /(\d{2})-(\d{2})-(\d{4})/];
-    for (const p of fechaPatterns) {
-      const match = texto.match(p);
-      if (match) {
-        try {
-          let fecha;
-          if (match[0].includes('-') && match[1].length === 4) {
-            fecha = new Date(`${match[1]}-${match[2]}-${match[3]}`);
-          } else {
-            fecha = new Date(`${match[3]}-${match[2]}-${match[1]}`);
-          }
-          if (!isNaN(fecha.getTime())) { resultado.fecha = fecha.toISOString().split('T')[0]; break; }
-        } catch { continue; }
-      }
-    }
-
-    const proveedorStopWords = [
-      'INFORMACION DEL CLIENTE', 'INFORMACIÓN DEL CLIENTE', 'CONDICIONES DE VENTA',
-      'CLIENTE:', 'DIRECCION:', 'DIRECCIÓN:', 'CUIT:', 'IVA RESPONSABLE',
-      'FACTURA', 'CAE', 'TELEFONO:', 'TELÉFONO:', 'EMAIL:', 'IIBB:',
-    ];
-    const cortarEnEncabezado = (str) => {
-      const upper = str.toUpperCase();
-      let corte = str.length;
-      for (const stop of proveedorStopWords) {
-        const idx = upper.indexOf(stop);
-        if (idx !== -1 && idx < corte) corte = idx;
-      }
-      return str.substring(0, corte).trim();
-    };
-
-    // Membrete: primera línea "limpia" del documento (nombre de empresa sin
-    // dígitos ni etiquetas). Suele ser el proveedor real, y tiene prioridad
-    // porque "Razón social:" a veces describe al cliente, no al emisor.
-    const primeraLinea = (texto.split('\n').map(l => l.trim()).find(l => l.length > 0)) || '';
-    const esMembreteLimpio = /^[A-ZÁÉÍÓÚ][A-Za-záéíóúñÑ0-9\s.&-]{1,59}$/.test(primeraLinea);
-    if (esMembreteLimpio) resultado.proveedor = primeraLinea.substring(0, 100);
-
-    if (!resultado.proveedor) {
-      const proveedorPatterns = [
-        // "Razón social:" — se descarta si pertenece al bloque del cliente
-        // (reconocible porque ahí le sigue "Documento:", ej. plantillas AFIP
-        // donde el emisor no repite su nombre bajo esa etiqueta).
-        { regex: /razón social\s*:?\s*([A-ZÁÉÍÓÚa-záéíóú\s.]{3,150})/i, esRazonSocial: true },
-        { regex: /(?:empresa|proveedor|emisor|nombre)\s*:?\s*([A-ZÁÉÍÓÚa-záéíóú\s.]{3,150})/i },
-        { regex: /([A-ZÁÉÍÓÚ][A-Za-záéíóúñÑ\s.]{3,150}?)\s*(?:Dirección|Direccion)\s*:/i },
-        { regex: /^([A-ZÁÉÍÓÚ][A-Za-záéíóúñÑ\s.]{5,150})$/m },
-      ];
-      for (const { regex, esRazonSocial } of proveedorPatterns) {
-        const match = texto.match(regex);
-        if (!match) continue;
-        if (esRazonSocial) {
-          // Ventana desde el inicio del match (incluye lo ya capturado, por si
-          // "Documento" quedó absorbido dentro del grupo) hasta 40 chars después.
-          const ventana = texto.substring(match.index, match.index + match[0].length + 40);
-          if (/documento\s*:/i.test(ventana)) continue;
-        }
-        const cortado = cortarEnEncabezado(match[1]);
-        if (cortado.length >= 3) { resultado.proveedor = cortado.substring(0, 100); break; }
-      }
-    }
-
-    return resultado;
-  }
-
-  async subirArchivo(file, movimiento_id) {
-    const ext = file.originalname.split('.').pop();
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
-    const storagePath = `comprobantes/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('comprobantes')
-      .upload(storagePath, file.buffer, { contentType: file.mimetype, upsert: false });
-    if (uploadError) throw new Error(`Storage error: ${uploadError.message}`);
-
-    const { data: urlData } = supabase.storage.from('comprobantes').getPublicUrl(storagePath);
-
-    let ocrTexto = null, ocrEstado = 'pendiente', ocrFecha = null, ocrMonto = null, ocrProveedor = null;
-    try {
-      ocrTexto = file.mimetype === 'application/pdf'
-        ? await this.parsePDF(file.buffer)
-        : await this.ocrImagen(file.buffer);
-      if (ocrTexto) {
-        const datos = this.extraerDatosOCR(ocrTexto);
-        ocrFecha = datos.fecha; ocrMonto = datos.monto; ocrProveedor = datos.proveedor;
-        ocrEstado = 'procesado';
-      }
-    } catch (ocrErr) {
-      console.error('OCR falló:', ocrErr.message);
-      ocrEstado = 'error';
-    }
-
-    const { data: comprobante, error: dbError } = await supabase
+  async persistir({ file, storagePath, extraction, estado, diagnostico, fingerprint = null, duplicateOfId = null }) {
+    const { data, error } = await supabase
       .from('comprobantes')
       .insert([{
-        movimiento_id: movimiento_id || null,
         nombre_archivo: file.originalname,
         tipo_archivo: file.mimetype,
-        url_archivo: urlData.publicUrl,
         storage_path: storagePath,
-        ocr_estado: ocrEstado,
-        ocr_texto: ocrTexto ? ocrTexto.substring(0, 5000) : null,
-        ocr_fecha: ocrFecha, ocr_monto: ocrMonto, ocr_proveedor: ocrProveedor
+        estado_analisis: estado,
+        extraccion: extraction,
+        diagnostico,
+        document_fingerprint: fingerprint,
+        duplicate_of_id: duplicateOfId
       }])
-      .select()
-      .single();
-    if (dbError) throw dbError;
-
-    return { comprobante, ocr: { estado: ocrEstado, fecha: ocrFecha, monto: ocrMonto, proveedor: ocrProveedor } };
-  }
-
-  async listar() {
-    const { data, error } = await supabase
-      .from('comprobantes')
-      .select('*, movimientos(id, descripcion, tipo, monto, fecha)')
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return { data };
-  }
-
-  async vincular(id, movimiento_id) {
-    const { data, error } = await supabase
-      .from('comprobantes')
-      .update({ movimiento_id })
-      .eq('id', id)
-      .select()
+      .select('*, comprobante_items(*), movimientos(id, descripcion, tipo, monto, fecha)')
       .single();
     if (error) throw error;
     return data;
   }
 
+  async persistirItems(comprobanteId, items) {
+    const rows = items.map((item, orden) => ({
+      comprobante_id: comprobanteId,
+      orden: orden + 1,
+      codigo: item.code,
+      descripcion: item.description,
+      cantidad: item.quantity,
+      precio_unitario: item.unitPrice,
+      bonificacion: item.discount,
+      alicuota_iva: item.ivaRate,
+      importe: item.lineTotal
+    }));
+    if (!rows.length) return [];
+    const { data, error } = await supabase.from('comprobante_items').insert(rows).select('*');
+    if (error) throw error;
+    return data;
+  }
+
+  async buscarDuplicado(fingerprint) {
+    const { data, error } = await supabase
+      .from('comprobantes')
+      .select('id')
+      .eq('document_fingerprint', fingerprint)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  }
+
+  async subirArchivo(file, email = null) {
+    if (!hasAllowedSignature(file.buffer, file.mimetype)) {
+      throw Object.assign(new Error('El contenido del archivo no coincide con el formato declarado.'), { status: 400 });
+    }
+
+    const extension = file.mimetype === 'application/pdf' ? 'pdf' : file.mimetype === 'image/png' ? 'png' : 'jpg';
+    const storagePath = `comprobantes/${crypto.randomUUID()}.${extension}`;
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(storagePath, file.buffer, { contentType: file.mimetype, upsert: false });
+    if (uploadError) throw new Error(`No se pudo guardar el comprobante: ${uploadError.message}`);
+
+    let extraction;
+    try {
+      extraction = await analyzeDocument(file.buffer, file.mimetype);
+    } catch (error) {
+      const comprobante = await this.persistir({
+        file, storagePath, extraction: null, estado: 'error',
+        diagnostico: { errors: [error.message], auto_created: false }
+      });
+      return { comprobante: await this.presentar(comprobante), movimiento: null, analysis: comprobante.diagnostico };
+    }
+
+    const validation = validateExtraction(extraction, process.env.COMPANY_CUIT);
+    const duplicate = await this.buscarDuplicado(validation.fingerprint);
+    if (duplicate) {
+      const diagnostico = {
+        errors: ['El comprobante ya fue cargado anteriormente.'],
+        auto_created: false,
+        duplicate_of_id: duplicate.id
+      };
+      const comprobante = await this.persistir({
+        file, storagePath, extraction, estado: 'requiere_revision', diagnostico, duplicateOfId: duplicate.id
+      });
+      comprobante.comprobante_items = await this.persistirItems(comprobante.id, extraction.items);
+      return { comprobante: await this.presentar(comprobante), movimiento: null, analysis: diagnostico };
+    }
+
+    const estado = validation.valid ? 'procesado' : 'requiere_revision';
+    const diagnostico = { errors: validation.errors, auto_created: false };
+    let comprobante;
+    try {
+      comprobante = await this.persistir({
+        file, storagePath, extraction, estado, diagnostico, fingerprint: validation.fingerprint
+      });
+    } catch (error) {
+      if (error.code !== '23505') throw error;
+      const existing = await this.buscarDuplicado(validation.fingerprint);
+      const duplicateRecord = await this.persistir({
+        file, storagePath, extraction, estado: 'requiere_revision',
+        diagnostico: { errors: ['El comprobante fue cargado simultáneamente por otro usuario.'], auto_created: false, duplicate_of_id: existing?.id || null },
+        duplicateOfId: existing?.id || null
+      });
+      duplicateRecord.comprobante_items = await this.persistirItems(duplicateRecord.id, extraction.items);
+      return { comprobante: await this.presentar(duplicateRecord), movimiento: null, analysis: duplicateRecord.diagnostico };
+    }
+    comprobante.comprobante_items = await this.persistirItems(comprobante.id, extraction.items);
+
+    if (!validation.valid) {
+      return { comprobante: await this.presentar(comprobante), movimiento: null, analysis: diagnostico };
+    }
+
+    try {
+      const movimiento = await movimientosService.crear(validation.movimiento, email);
+      const finalDiagnostico = { errors: [], auto_created: true };
+      const { data, error } = await supabase
+        .from('comprobantes')
+        .update({ movimiento_id: movimiento.id, diagnostico: finalDiagnostico })
+        .eq('id', comprobante.id)
+        .select('*, comprobante_items(*), movimientos(id, descripcion, tipo, monto, fecha)')
+        .single();
+      if (error) throw error;
+      return { comprobante: await this.presentar(data), movimiento, analysis: finalDiagnostico };
+    } catch (error) {
+      const finalDiagnostico = { errors: [`No se pudo crear el movimiento automático: ${error.message}`], auto_created: false };
+      const { data, error: updateError } = await supabase
+        .from('comprobantes')
+        .update({ estado_analisis: 'requiere_revision', diagnostico: finalDiagnostico })
+        .eq('id', comprobante.id)
+        .select('*, comprobante_items(*), movimientos(id, descripcion, tipo, monto, fecha)')
+        .single();
+      if (updateError) throw updateError;
+      return { comprobante: await this.presentar(data), movimiento: null, analysis: finalDiagnostico };
+    }
+  }
+
+  async listar() {
+    const { data, error } = await supabase
+      .from('comprobantes')
+      .select('*, movimientos(id, descripcion, tipo, monto, fecha), comprobante_items(*)')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return { data: await Promise.all((data || []).map(item => this.presentar(item))) };
+  }
+
   async eliminar(id) {
-    const { data: comp } = await supabase.from('comprobantes').select('storage_path').eq('id', id).single();
-    if (comp?.storage_path) await supabase.storage.from('comprobantes').remove([comp.storage_path]);
+    const { data: comp, error: readError } = await supabase.from('comprobantes').select('storage_path').eq('id', id).single();
+    if (readError) throw readError;
+    if (comp?.storage_path) {
+      const { error } = await supabase.storage.from(BUCKET).remove([comp.storage_path]);
+      if (error) throw new Error(`No se pudo eliminar el archivo: ${error.message}`);
+    }
     const { error } = await supabase.from('comprobantes').delete().eq('id', id);
     if (error) throw error;
     return { message: 'Comprobante eliminado' };
@@ -183,30 +177,17 @@ class ComprobantesService {
   async limpiarVencidos() {
     const fechaLimite = new Date();
     fechaLimite.setMonth(fechaLimite.getMonth() - 6);
-    const fechaLimiteISO = fechaLimite.toISOString();
-
     const { data: vencidos, error } = await supabase
-      .from('comprobantes')
-      .select('id, storage_path')
-      .lt('created_at', fechaLimiteISO)
-      .not('storage_path', 'is', null);
-
+      .from('comprobantes').select('id, storage_path')
+      .lt('created_at', fechaLimite.toISOString()).not('storage_path', 'is', null);
     if (error) throw error;
-    if (!vencidos || vencidos.length === 0) return { eliminados: 0 };
-
-    const paths = vencidos.map(c => c.storage_path).filter(Boolean);
-    if (paths.length > 0) {
-      await supabase.storage.from('comprobantes').remove(paths);
-    }
-
-    const ids = vencidos.map(c => c.id);
-    await supabase
-      .from('comprobantes')
-      .update({ url_archivo: null, storage_path: null })
-      .in('id', ids);
-
-    console.log(`[Comprobantes] ${ids.length} archivos vencidos eliminados del storage.`);
-    return { eliminados: ids.length };
+    const paths = (vencidos || []).map(item => item.storage_path).filter(Boolean);
+    if (!paths.length) return { eliminados: 0 };
+    const { error: deleteError } = await supabase.storage.from(BUCKET).remove(paths);
+    if (deleteError) throw deleteError;
+    const { error: updateError } = await supabase.from('comprobantes').update({ storage_path: null }).in('id', vencidos.map(item => item.id));
+    if (updateError) throw updateError;
+    return { eliminados: paths.length };
   }
 }
 

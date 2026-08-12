@@ -107,7 +107,7 @@ class SalariosController {
   // Métricas
   async metricas(req, res, next) {
     try {
-      const result = await salariosService.getMetricas()
+      const result = await salariosService.getMetricas(req.query)
       res.json(result)
     } catch (err) { next(err) }
   }
