@@ -8,7 +8,7 @@ const INSTRUCTION = `Extraé datos de un comprobante financiero argentino. Respo
 async function analyzeDocument(buffer, mimeType) {
   if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY no está configurada.');
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
+  const timeout = setTimeout(() => controller.abort(), 60000);
   try {
     const response = await fetch(`${ENDPOINT}?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`, {
       method: 'POST',
