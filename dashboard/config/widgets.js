@@ -36,10 +36,6 @@ const DASHBOARD_WIDGETS = {
     module: 'operations',
     sourceEndpoint: 'GET /api/operations/tareas/metricas',
   },
-  planificacion_metricas_proyectos: {
-    module: 'planification',
-    sourceEndpoint: 'GET /api/planification/proyectos/metricas',
-  },
 
   // Variantes "últimos 6 meses": mismo endpoint que su contraparte mensual —
   // el frontend arma el agregado pidiendo el endpoint 6 veces (uno por mes) y

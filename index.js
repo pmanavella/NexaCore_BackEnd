@@ -17,9 +17,6 @@ const tareasRoutes = require('./operations/routes/tareas');
 // CRM module
 const contactosRoutes = require('./crm/routes/contactos');
 
-// Planification module
-const proyectosRoutes = require('./planification/routes/proyectos');
-
 // Finance — Salarios
 const salariosRoutes = require('./finance/routes/salarios');
 
@@ -76,9 +73,6 @@ app.use('/api/operations/tareas', tareasRoutes);
 
 // ── CRM ──────────────────────────────────────────────
 app.use('/api/crm/contactos', contactosRoutes);
-
-// ── Planification ────────────────────────────────────
-app.use('/api/planification/proyectos', proyectosRoutes);
 
 // ── Salarios ──────────────────────────────────────────
 app.use('/api/finance/salarios', salariosRoutes);
@@ -156,9 +150,6 @@ app.listen(PORT, () => {
 // // CRM module
 // const contactosRoutes = require('./crm/routes/contactos');
 
-// // Planification module
-// const proyectosRoutes = require('./planification/routes/proyectos');
-
 // // Finance — Salarios
 // const salariosRoutes = require('./finance/routes/salarios');
 
@@ -200,9 +191,6 @@ app.listen(PORT, () => {
 
 // // ── CRM ──────────────────────────────────────────────
 // app.use('/api/crm/contactos', contactosRoutes);
-
-// // ── Planification ────────────────────────────────────
-// app.use('/api/planification/proyectos', proyectosRoutes);
 
 // // ── Salarios ──────────────────────────────────────────
 // app.use('/api/finance/salarios', salariosRoutes);
