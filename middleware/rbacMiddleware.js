@@ -15,7 +15,7 @@ function requireRole(...allowedRoles) {
 // requireModuleAccess debe usarse DESPUÉS de authenticate.
 // Consulta la Matriz de permisos real (usuario_modulo_permisos > rol_modulo_permisos) para
 // req.user.id — nunca confía en rol/módulo enviado por query, body o headers del cliente.
-// moduloNombre debe coincidir con la columna `modulos.nombre` (slug: 'finance', 'crm', 'operations', 'planification', ...).
+// moduloNombre debe coincidir con la columna `modulos.nombre` (slug: 'finance', 'crm', 'operations', ...).
 // moduloLabel es solo el texto legible para el mensaje de error (ej. "Finanzas").
 function requireModuleAccess(moduloNombre, moduloLabel = moduloNombre) {
   return async (req, res, next) => {
