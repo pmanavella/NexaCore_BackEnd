@@ -1,9 +1,11 @@
 const supabase = require('../../config/supabase');
 const organizacionService = require('../../organization/services/organizacionService');
-const { DASHBOARD_WIDGETS } = require('../config/widgets');
+const { DASHBOARD_WIDGETS, WIDGET_PERIODS, CHART_TYPES } = require('../config/widgets');
 
 const WIDGET_SIZES       = ['sm', 'md', 'lg'];
 const DEFAULT_WIDGET_SIZE = 'sm';
+const DEFAULT_WIDGET_PERIOD = 'month';
+const DEFAULT_CHART_TYPE    = 'kpi';
 const MAX_VISTAS          = 10;
 const MAX_NOMBRE_LENGTH   = 100;
 
@@ -11,21 +13,86 @@ class DashboardViewsService {
 
   // ── Helpers (duplicados de dashboardService — servicios independientes) ────
 
+  _opcionesWidget(widgetId) {
+    const widget = DASHBOARD_WIDGETS[widgetId];
+    return {
+      periods: widget?.periods || WIDGET_PERIODS,
+      chartTypes: widget?.allowedChartTypes || CHART_TYPES,
+      defaultPeriod: widget?.defaultPeriod || DEFAULT_WIDGET_PERIOD,
+      defaultChartType: widget?.defaultChartType || DEFAULT_CHART_TYPE,
+    };
+  }
+
+  _instanceIdLegacy(id) {
+    return `legacy:${id}`;
+  }
+
+  // Acepta string (viejo), {id, size}, {id, size, period, chartType} y el
+  // actual con `instanceId`; devuelve siempre [{id, instanceId, size, period,
+  // chartType}]. `id` identifica la métrica (catálogo/permisos); `instanceId`
+  // identifica una instancia concreta y NO participa en autorización. Entradas
+  // legacy sin `instanceId` reciben uno estable `legacy:<id>`. `period`/
+  // `chartType` faltantes caen al default del catálogo (para los IDs `_6m` ese
+  // default es '6m'). La validación estricta (400) vive en `_validarEntradasWidgets`.
   _normalizarWidgets(widgetsInput) {
     const normalizados = (widgetsInput || [])
       .map(entry => {
         const id = typeof entry === 'string' ? entry : entry?.id;
         if (typeof id !== 'string' || !id) return null;
         const size = WIDGET_SIZES.includes(entry?.size) ? entry.size : DEFAULT_WIDGET_SIZE;
-        return { id, size };
+        const { periods, chartTypes, defaultPeriod, defaultChartType } = this._opcionesWidget(id);
+        const rawPeriod = typeof entry === 'string' ? undefined : entry?.period;
+        const rawChart = typeof entry === 'string' ? undefined : entry?.chartType;
+        const period = periods.includes(rawPeriod) ? rawPeriod : defaultPeriod;
+        const chartType = chartTypes.includes(rawChart) ? rawChart : defaultChartType;
+        const rawInstanceId = typeof entry === 'string' ? undefined : entry?.instanceId;
+        const instanceId = (typeof rawInstanceId === 'string' && rawInstanceId.trim())
+          ? rawInstanceId.trim()
+          : this._instanceIdLegacy(id);
+        return { id, instanceId, size, period, chartType };
       })
       .filter(Boolean);
 
+    // Deduplicación defensiva por `instanceId` (antes por `id`): se conserva la
+    // primera aparición y el orden. Distintas instancias del mismo `id` conviven.
     const vistos = new Set();
     return normalizados.filter(w => {
-      if (vistos.has(w.id)) return false;
-      vistos.add(w.id);
+      if (vistos.has(w.instanceId)) return false;
+      vistos.add(w.instanceId);
       return true;
+    });
+  }
+
+  _validarEntradasWidgets(widgetsInput) {
+    (widgetsInput || []).forEach(entry => {
+      if (typeof entry === 'string' || !entry || typeof entry !== 'object') return;
+      if (entry.instanceId !== undefined && entry.instanceId !== null
+          && (typeof entry.instanceId !== 'string' || entry.instanceId.trim() === '')) {
+        throw Object.assign(
+          new Error('Cada mosaico con "instanceId" debe usar un string no vacío.'),
+          { status: 400 }
+        );
+      }
+      const widget = DASHBOARD_WIDGETS[entry.id];
+      if (!widget) return; // IDs desconocidos ya se rechazan en `actualizarVista`
+      if (entry.period !== undefined && entry.period !== null) {
+        const permitidos = widget.periods || WIDGET_PERIODS;
+        if (!permitidos.includes(entry.period)) {
+          throw Object.assign(
+            new Error(`Período inválido para el mosaico "${entry.id}": "${entry.period}". Opciones: ${permitidos.join(', ')}.`),
+            { status: 400 }
+          );
+        }
+      }
+      if (entry.chartType !== undefined && entry.chartType !== null) {
+        const permitidos = widget.allowedChartTypes || CHART_TYPES;
+        if (!permitidos.includes(entry.chartType)) {
+          throw Object.assign(
+            new Error(`Visualización inválida para el mosaico "${entry.id}": "${entry.chartType}". Opciones: ${permitidos.join(', ')}.`),
+            { status: 400 }
+          );
+        }
+      }
     });
   }
 
@@ -151,7 +218,7 @@ class DashboardViewsService {
 
       const widgetsUnicos = this._normalizarWidgets(body.widgets);
 
-      const idsDesconocidos = widgetsUnicos.filter(w => !DASHBOARD_WIDGETS[w.id]).map(w => w.id);
+      const idsDesconocidos = [...new Set(widgetsUnicos.filter(w => !DASHBOARD_WIDGETS[w.id]).map(w => w.id))];
       if (idsDesconocidos.length > 0) {
         throw Object.assign(
           new Error(`Mosaico(s) desconocido(s): ${idsDesconocidos.join(', ')}.`),
@@ -159,10 +226,12 @@ class DashboardViewsService {
         );
       }
 
+      this._validarEntradasWidgets(body.widgets);
+
       const allowedModules = await this._modulosHabilitados(usuarioId);
-      const idsNoAutorizados = widgetsUnicos
+      const idsNoAutorizados = [...new Set(widgetsUnicos
         .filter(w => !this._widgetPermitido(w.id, allowedModules, userRole))
-        .map(w => w.id);
+        .map(w => w.id))];
 
       if (idsNoAutorizados.length > 0) {
         throw Object.assign(
