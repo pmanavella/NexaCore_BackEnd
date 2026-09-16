@@ -194,15 +194,33 @@ class OrganizacionService {
   async eliminarNodo(id, requesterId) {
     await this._verificarAccesoEdicion(id, requesterId)
 
-    // Desconectar hijos antes de eliminar
-    await supabase
+    // Bloquear si tiene subordinados activos: no reasignamos ni desconectamos
+    // en silencio, quien quita el nodo debe resolver la dependencia primero.
+    const { data: subordinados, error: subErr } = await supabase
       .from('organigrama')
-      .update({ superior_id: null })
+      .select('id, nombre_manual, apellido_manual, usuarios(nombre), empleados(nombre, apellido)')
       .eq('superior_id', id)
+      .eq('activo', true)
 
+    if (subErr) throw subErr
+
+    if (subordinados?.length) {
+      const nombres = subordinados
+        .map(s => s.usuarios?.nombre || (s.empleados ? `${s.empleados.nombre} ${s.empleados.apellido}` : null) || [s.nombre_manual, s.apellido_manual].filter(Boolean).join(' ') || 'Sin nombre')
+        .join(', ')
+      throw Object.assign(
+        new Error(`No se puede quitar esta persona del organigrama porque tiene personas que reportan directamente a ella (${nombres}). Reasigná primero sus dependencias.`),
+        { status: 409 }
+      )
+    }
+
+    // Elimina únicamente el nodo del organigrama: no toca usuarios, empleados,
+    // credenciales ni permisos. La FK organigrama_superior_id_fkey es
+    // ON DELETE SET NULL, pero al bloquear arriba no debería llegar a aplicarse
+    // sobre subordinados activos.
     const { error } = await supabase.from('organigrama').delete().eq('id', id)
     if (error) throw error
-    return { message: 'Nodo eliminado del organigrama' }
+    return { message: 'Persona quitada del organigrama' }
   }
 
   // ── PERMISOS POR USUARIO ─────────────────────────────────────

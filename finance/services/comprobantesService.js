@@ -106,7 +106,7 @@ class ComprobantesService {
     }
 
     const estado = validation.valid ? 'procesado' : 'requiere_revision';
-    const diagnostico = { errors: validation.errors, auto_created: false };
+    const diagnostico = { errors: validation.errors, warnings: validation.warnings, auto_created: false };
     let comprobante;
     try {
       comprobante = await this.persistir({
@@ -131,7 +131,7 @@ class ComprobantesService {
 
     try {
       const movimiento = await movimientosService.crear(validation.movimiento, email);
-      const finalDiagnostico = { errors: [], auto_created: true };
+      const finalDiagnostico = { errors: [], warnings: validation.warnings, auto_created: true };
       const { data, error } = await supabase
         .from('comprobantes')
         .update({ movimiento_id: movimiento.id, diagnostico: finalDiagnostico })
