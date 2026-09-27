@@ -44,6 +44,9 @@ const dashboardViewsRoutes = require('./dashboard/routes/dashboardViewsRoutes');
 // Indicadores (KPI)
 const indicadoresRoutes = require('./indicators/routes/indicadores');
 
+// Nexi (asistente, solo lectura)
+const nexiRoutes = require('./nexi/routes/nexi');
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -102,6 +105,9 @@ app.use('/api/dashboard', dashboardViewsRoutes);
 
 // ── Indicadores ────────────────────────────────────────
 app.use('/api/indicadores', indicadoresRoutes);
+
+// ── Nexi ───────────────────────────────────────────────
+app.use('/api/nexi', nexiRoutes);
 
 // Health check (público — sin auth)
 app.get('/api/health', (req, res) => {
