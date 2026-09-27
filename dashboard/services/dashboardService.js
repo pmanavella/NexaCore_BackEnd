@@ -1,6 +1,8 @@
 const supabase = require('../../config/supabase');
 const organizacionService = require('../../organization/services/organizacionService');
 const { DASHBOARD_WIDGETS, WIDGET_PERIODS, CHART_TYPES } = require('../config/widgets');
+const indicadoresService = require('../../indicators/services/indicadoresService');
+const { UUID_REGEX } = indicadoresService;
 
 const DASHBOARD_NAME = 'Panel General';
 const WIDGET_SIZES = ['sm', 'md', 'lg'];
@@ -54,6 +56,14 @@ class DashboardService {
         const instanceId = (typeof rawInstanceId === 'string' && rawInstanceId.trim())
           ? rawInstanceId.trim()
           : this._instanceIdLegacy(id);
+        // Mosaicos de indicador: `indicatorId` se conserva (y es obligatorio);
+        // el resto de los mosaicos mantiene exactamente su estructura previa.
+        if (DASHBOARD_WIDGETS[id]?.requiresIndicator) {
+          const rawIndicatorId = typeof entry === 'string' ? undefined : entry?.indicatorId;
+          const indicatorId = typeof rawIndicatorId === 'string' ? rawIndicatorId.trim() : '';
+          if (!UUID_REGEX.test(indicatorId)) return null;
+          return { id, instanceId, size, period, chartType, indicatorId };
+        }
         return { id, instanceId, size, period, chartType };
       })
       .filter(Boolean);
@@ -77,6 +87,9 @@ class DashboardService {
   // Las entradas legacy (string o sin esas claves) no disparan error.
   _validarEntradasWidgets(widgetsInput) {
     (widgetsInput || []).forEach(entry => {
+      if (typeof entry === 'string' && DASHBOARD_WIDGETS[entry]?.requiresIndicator) {
+        throw Object.assign(new Error(`El mosaico "${entry}" requiere "indicatorId".`), { status: 400 });
+      }
       if (typeof entry === 'string' || !entry || typeof entry !== 'object') return;
       if (entry.instanceId !== undefined && entry.instanceId !== null
           && (typeof entry.instanceId !== 'string' || entry.instanceId.trim() === '')) {
@@ -87,6 +100,13 @@ class DashboardService {
       }
       const widget = DASHBOARD_WIDGETS[entry.id];
       if (!widget) return; // IDs desconocidos ya se rechazan en `guardarConfiguracion`
+      if (widget.requiresIndicator) {
+        if (typeof entry.indicatorId !== 'string' || !UUID_REGEX.test(entry.indicatorId.trim())) {
+          throw Object.assign(new Error(`El mosaico "${entry.id}" requiere un "indicatorId" válido.`), { status: 400 });
+        }
+      } else if (entry.indicatorId !== undefined) {
+        throw Object.assign(new Error(`"indicatorId" solo se admite en mosaicos de indicador (mosaico "${entry.id}").`), { status: 400 });
+      }
       if (entry.period !== undefined && entry.period !== null) {
         const permitidos = widget.periods || WIDGET_PERIODS;
         if (!permitidos.includes(entry.period)) {
@@ -123,8 +143,45 @@ class DashboardService {
     const widget = DASHBOARD_WIDGETS[widgetId];
     if (!widget) return false;
     if (!allowedModules.includes(widget.module)) return false;
+    if (widget.requiresModules && !widget.requiresModules.every(m => allowedModules.includes(m))) return false;
     if (widget.requiresRole && !widget.requiresRole.includes(userRole)) return false;
     return true;
+  }
+
+  // Mosaicos de indicador: el `indicatorId` debe existir. Uno inactivo solo se
+  // admite si esa misma instancia ya lo usaba en la configuración guardada — no
+  // se agregan mosaicos nuevos con indicadores inactivos, pero volver a guardar
+  // un tablero existente no falla.
+  _validarIndicadores(widgets, estadoPorId, widgetsPrevios) {
+    const previos = new Set(this._normalizarWidgets(widgetsPrevios)
+      .filter(w => w.indicatorId)
+      .map(w => `${w.instanceId}|${w.indicatorId}`));
+    const inexistentes = new Set();
+    const inactivos = new Set();
+    for (const w of widgets) {
+      if (!DASHBOARD_WIDGETS[w.id]?.requiresIndicator) continue;
+      if (!estadoPorId.has(w.indicatorId)) inexistentes.add(w.indicatorId);
+      else if (!estadoPorId.get(w.indicatorId) && !previos.has(`${w.instanceId}|${w.indicatorId}`)) inactivos.add(w.indicatorId);
+    }
+    if (inexistentes.size > 0) {
+      throw Object.assign(new Error(`Indicador(es) inexistente(s): ${[...inexistentes].join(', ')}.`), { status: 400 });
+    }
+    if (inactivos.size > 0) {
+      throw Object.assign(
+        new Error(`Indicador(es) inactivo(s): ${[...inactivos].join(', ')}. No pueden agregarse como nuevos mosaicos.`),
+        { status: 400 }
+      );
+    }
+  }
+
+  async _verificarIndicadores(widgets, obtenerWidgetsPrevios) {
+    const ids = widgets.filter(w => DASHBOARD_WIDGETS[w.id]?.requiresIndicator).map(w => w.indicatorId);
+    if (ids.length === 0) return;
+    const [estadoPorId, widgetsPrevios] = await Promise.all([
+      indicadoresService.obtenerEstadoIndicadores(ids),
+      obtenerWidgetsPrevios(),
+    ]);
+    this._validarIndicadores(widgets, estadoPorId, widgetsPrevios);
   }
 
   async obtenerConfiguracion(usuarioId, userRole) {
@@ -188,6 +245,16 @@ class DashboardService {
         { status: 403 }
       );
     }
+
+    await this._verificarIndicadores(widgetsUnicos, async () => {
+      const { data: previa, error: errPrevia } = await supabase
+        .from('dashboard_configuraciones')
+        .select('widgets')
+        .eq('usuario_id', usuarioId)
+        .maybeSingle();
+      if (errPrevia) throw errPrevia;
+      return previa?.widgets || [];
+    });
 
     const { data: saved, error } = await supabase
       .from('dashboard_configuraciones')

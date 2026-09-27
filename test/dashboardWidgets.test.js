@@ -7,6 +7,11 @@ process.env.SUPABASE_SERVICE_KEY ||= 'test-service-key';
 const dashboardService = require('../dashboard/services/dashboardService');
 const dashboardViewsService = require('../dashboard/services/dashboardViewsService');
 const { DASHBOARD_WIDGETS } = require('../dashboard/config/widgets');
+const indicadoresService = require('../indicators/services/indicadoresService');
+
+const IND_1 = '11111111-1111-4111-8111-111111111111';
+const IND_2 = '22222222-2222-4222-8222-222222222222';
+const IND_3 = '33333333-3333-4333-8333-333333333333';
 
 // Ambos servicios duplican los helpers a propósito (son independientes); cada
 // caso se corre contra los dos para garantizar que los contratos quedan alineados.
@@ -169,6 +174,71 @@ for (const [nombre, svc] of servicios) {
     assert.equal(out.length, 2);
     assert.ok(out.every(w => !DASHBOARD_WIDGETS[w.id]));
   });
+
+  // ── Mosaicos de indicador (indicador_kpi) ───────────────────────────────────
+
+  test(`${nombre}: indicador_kpi conserva indicatorId (trim) y admite line/gauge`, () => {
+    const out = svc._normalizarWidgets([
+      { id: 'indicador_kpi', instanceId: 'A', size: 'md', period: '6m', chartType: 'line', indicatorId: ` ${IND_1} ` },
+    ]);
+    assert.deepEqual(out, [{ id: 'indicador_kpi', instanceId: 'A', size: 'md', period: '6m', chartType: 'line', indicatorId: IND_1 }]);
+  });
+
+  test(`${nombre}: mismo indicador en varias instancias (sin dedup por indicatorId)`, () => {
+    const out = svc._normalizarWidgets([
+      { id: 'indicador_kpi', instanceId: 'A', period: 'month', chartType: 'kpi', indicatorId: IND_1 },
+      { id: 'indicador_kpi', instanceId: 'B', period: '12m', chartType: 'bar', indicatorId: IND_1 },
+      { id: 'indicador_kpi', instanceId: 'C', period: '3m', chartType: 'gauge', indicatorId: IND_2 },
+    ]);
+    assert.deepEqual(out.map(w => [w.instanceId, w.indicatorId, w.period, w.chartType]), [
+      ['A', IND_1, 'month', 'kpi'],
+      ['B', IND_1, '12m', 'bar'],
+      ['C', IND_2, '3m', 'gauge'],
+    ]);
+  });
+
+  test(`${nombre}: los mosaicos existentes NO reciben indicatorId`, () => {
+    const out = svc._normalizarWidgets([{ id: 'finanzas_ingresos_mes', instanceId: 'A', indicatorId: IND_1 }]);
+    assert.deepEqual(out, [{ id: 'finanzas_ingresos_mes', instanceId: 'A', size: 'sm', period: 'month', chartType: 'kpi' }]);
+  });
+
+  test(`${nombre}: indicador_kpi sin indicatorId válido se descarta al normalizar`, () => {
+    assert.deepEqual(svc._normalizarWidgets(['indicador_kpi', { id: 'indicador_kpi', instanceId: 'A', indicatorId: 'no-uuid' }]), []);
+  });
+
+  test(`${nombre}: _validarEntradasWidgets exige indicatorId en indicador_kpi → 400`, () => {
+    assert.throws(() => svc._validarEntradasWidgets(['indicador_kpi']), err => err.status === 400 && /indicatorId/.test(err.message));
+    assert.throws(() => svc._validarEntradasWidgets([{ id: 'indicador_kpi', instanceId: 'A' }]), err => err.status === 400);
+    assert.throws(() => svc._validarEntradasWidgets([{ id: 'indicador_kpi', instanceId: 'A', indicatorId: 'abc' }]), err => err.status === 400);
+    assert.doesNotThrow(() => svc._validarEntradasWidgets([{ id: 'indicador_kpi', instanceId: 'A', indicatorId: IND_1, chartType: 'gauge', period: '12m' }]));
+  });
+
+  test(`${nombre}: _validarEntradasWidgets rechaza indicatorId en otros mosaicos y chartType no permitido`, () => {
+    assert.throws(() => svc._validarEntradasWidgets([{ id: 'finanzas_ingresos_mes', instanceId: 'A', indicatorId: IND_1 }]), err => err.status === 400);
+    assert.throws(() => svc._validarEntradasWidgets([{ id: 'indicador_kpi', instanceId: 'A', indicatorId: IND_1, chartType: 'list' }]), err => err.status === 400);
+    assert.throws(() => svc._validarEntradasWidgets([{ id: 'finanzas_ingresos_mes', instanceId: 'A', chartType: 'gauge' }]), err => err.status === 400);
+  });
+
+  test(`${nombre}: _widgetPermitido indicador_kpi requiere 'indicadores' y 'finance'`, () => {
+    assert.equal(svc._widgetPermitido('indicador_kpi', ['indicadores', 'finance'], 'Empleado'), true);
+    assert.equal(svc._widgetPermitido('indicador_kpi', ['indicadores'], 'Empleado'), false);
+    assert.equal(svc._widgetPermitido('indicador_kpi', ['finance'], 'Superadmin'), false);
+    // Los mosaicos existentes no cambian.
+    assert.equal(svc._widgetPermitido('finanzas_ingresos_mes', ['finance'], 'Empleado'), true);
+  });
+
+  test(`${nombre}: _validarIndicadores — inexistente → 400; inactivo nuevo → 400; inactivo ya guardado → OK`, () => {
+    const estado = new Map([[IND_1, true], [IND_2, false]]);
+    const kpi = (instanceId, indicatorId) => ({ id: 'indicador_kpi', instanceId, size: 'sm', period: 'month', chartType: 'kpi', indicatorId });
+
+    assert.doesNotThrow(() => svc._validarIndicadores([kpi('A', IND_1)], estado, []));
+    assert.throws(() => svc._validarIndicadores([kpi('A', IND_3)], estado, []), err => err.status === 400 && /inexistente/.test(err.message));
+    assert.throws(() => svc._validarIndicadores([kpi('B', IND_2)], estado, []), err => err.status === 400 && /inactivo/.test(err.message));
+    // La instancia ya existía con ese indicador: volver a guardar el tablero no falla.
+    assert.doesNotThrow(() => svc._validarIndicadores([kpi('B', IND_2), kpi('A', IND_1)], estado, [kpi('B', IND_2)]));
+    // Una instancia NUEVA con el mismo indicador inactivo sigue rechazándose.
+    assert.throws(() => svc._validarIndicadores([kpi('B', IND_2), kpi('C', IND_2)], estado, [kpi('B', IND_2)]), err => err.status === 400);
+  });
 }
 
 // ── CASO 7 (permisos, end-to-end del service): dos instancias de un widget no
@@ -199,6 +269,56 @@ test('dashboardService.guardarConfiguracion: period inválido → 400 antes de t
     ], 'Superadmin'),
     err => err.status === 400
   );
+});
+
+test('dashboardService.guardarConfiguracion: indicador inactivo en instancia nueva → 400 sin persistir', async (t) => {
+  const svc = dashboardService;
+  t.mock.method(svc, '_modulosHabilitados', async () => ['indicadores', 'finance']);
+  t.mock.method(indicadoresService, 'obtenerEstadoIndicadores', async () => new Map([[IND_2, false]]));
+  const supabase = require('../config/supabase');
+  const from = t.mock.method(supabase, 'from', () => ({
+    select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { widgets: [] }, error: null }) }) }),
+    upsert: () => { throw new Error('no debería persistir'); },
+  }));
+
+  await assert.rejects(
+    () => svc.guardarConfiguracion('user-1', [
+      { id: 'indicador_kpi', instanceId: 'A', period: 'month', chartType: 'kpi', indicatorId: IND_2 },
+    ], 'Dirección'),
+    err => err.status === 400 && /inactivo/.test(err.message)
+  );
+  assert.equal(from.mock.callCount(), 1); // solo leyó la configuración previa
+});
+
+test('dashboardService.guardarConfiguracion: indicador_kpi sin acceso a finance → 403', async (t) => {
+  const svc = dashboardService;
+  t.mock.method(svc, '_modulosHabilitados', async () => ['indicadores']);
+  const supabase = require('../config/supabase');
+  t.mock.method(supabase, 'from', () => { throw new Error('no debería llegar a persistir'); });
+
+  await assert.rejects(
+    () => svc.guardarConfiguracion('user-1', [
+      { id: 'indicador_kpi', instanceId: 'A', period: 'month', chartType: 'kpi', indicatorId: IND_1 },
+    ], 'Dirección'),
+    err => err.status === 403
+  );
+});
+
+test('dashboardService.obtenerConfiguracion: un mosaico de indicador guardado se devuelve con indicatorId', async (t) => {
+  const svc = dashboardService;
+  t.mock.method(svc, '_modulosHabilitados', async () => ['indicadores', 'finance']);
+  const supabase = require('../config/supabase');
+  const guardados = [
+    { id: 'finanzas_ingresos_mes', instanceId: 'X', size: 'sm', period: 'month', chartType: 'kpi' },
+    { id: 'indicador_kpi', instanceId: 'A', size: 'md', period: '6m', chartType: 'line', indicatorId: IND_2 },
+  ];
+  t.mock.method(supabase, 'from', () => ({
+    select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { widgets: guardados }, error: null }) }) }),
+  }));
+
+  const out = await svc.obtenerConfiguracion('user-1', 'Dirección');
+  // El indicador IND_2 puede estar inactivo: la lectura no consulta su estado ni falla.
+  assert.deepEqual(out.dashboard.widgets, guardados);
 });
 
 // ── Catálogo ────────────────────────────────────────────────────────────────

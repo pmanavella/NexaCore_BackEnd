@@ -1,5 +1,6 @@
 const supabase = require('../../config/supabase');
 const { resolverPeriodo, rangoMes, mesAnterior } = require('../../utils/periodo');
+const { TIPOS_VALIDOS, CATEGORIAS_VALIDAS } = require('../config/movimientos');
 
 async function adjuntarUrlsFirmadas(movimientos) {
   return Promise.all((movimientos || []).map(async movimiento => {
@@ -12,9 +13,6 @@ async function adjuntarUrlsFirmadas(movimientos) {
     return { ...movimiento, comprobantes };
   }));
 }
-
-const TIPOS_VALIDOS = ['Ingreso', 'Gasto'];
-const CATEGORIAS_VALIDAS = ['Tecnología', 'RRHH', 'Insumos', 'Servicios', 'Inversión', 'Otros', 'Suscripción'];
 
 class MovimientosService {
   async listar({ tipo, categoria, fecha_desde, fecha_hasta, search } = {}) {

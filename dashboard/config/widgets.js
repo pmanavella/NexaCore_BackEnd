@@ -22,8 +22,14 @@
 // Valores globales admitidos: WIDGET_PERIODS y CHART_TYPES (abajo).
 // Las entradas `_6m` se conservan solo por compatibilidad con configuraciones
 // ya guardadas — los mosaicos nuevos usan el ID base + la propiedad `period`.
+//
+// INDICADORES (KPI):
+//   - `requiresIndicator`: la instancia debe llevar `indicatorId` (uuid de
+//                          public.indicadores). Solo estos mosaicos lo admiten.
+//   - `requiresModules`  : módulos adicionales a `module` que el usuario debe
+//                          tener habilitados (los KPI calculan datos de Finanzas).
 const WIDGET_PERIODS = ['month', '3m', '6m', '12m'];
-const CHART_TYPES = ['kpi', 'area', 'bar', 'list'];
+const CHART_TYPES = ['kpi', 'area', 'bar', 'list', 'line', 'gauge'];
 
 const DASHBOARD_WIDGETS = {
   finanzas_ingresos_mes: {
@@ -81,6 +87,20 @@ const DASHBOARD_WIDGETS = {
     periods: ['month', '3m', '6m', '12m'],
     defaultPeriod: 'month',
     allowedChartTypes: ['kpi', 'bar', 'list'],
+    defaultChartType: 'kpi',
+  },
+  // Un mismo indicador puede aparecer en varias instancias (distinto
+  // `instanceId`, `period` y `chartType`). `period` define la ventana del
+  // histórico; la granularidad de los puntos es la frecuencia del indicador.
+  // 'kpi' y 'gauge' usan `ultimoValido`; 'line', 'bar' y 'area' usan `puntos`.
+  indicador_kpi: {
+    module: 'indicadores',
+    requiresModules: ['finance'],
+    requiresIndicator: true,
+    sourceEndpoint: 'GET /api/indicadores/:indicatorId/historico?period=<period>',
+    periods: ['month', '3m', '6m', '12m'],
+    defaultPeriod: 'month',
+    allowedChartTypes: ['kpi', 'line', 'bar', 'area', 'gauge'],
     defaultChartType: 'kpi',
   },
 
