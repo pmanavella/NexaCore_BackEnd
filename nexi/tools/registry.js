@@ -55,6 +55,11 @@ function validarDefinicion(h) {
   }
   if (!ALCANCES.includes(h.alcance)) fallas.push('alcance inválido');
   if (typeof h.handler !== 'function') fallas.push('sin handler');
+  if (h.requisitosRol !== undefined) {
+    if (!Array.isArray(h.requisitosRol) || h.requisitosRol.length === 0 ||
+        h.requisitosRol.some(r => typeof r !== 'string' || !r))
+      fallas.push('requisitosRol debe ser un array no vacío de strings');
+  }
   if (fallas.length) throw new Error(`Herramienta Nexi "${h.nombre}" inválida: ${fallas.join(', ')}.`);
 }
 
@@ -147,6 +152,12 @@ async function ejecutar({ nombre, argumentos, usuario, conversacionId, ahora = n
     return finalizar('ERROR', 'ERROR_PERMISOS', fallo(MENSAJES.INTERNO), valores);
   }
   if (!nexiPermisos.cumpleRequisitos(niveles, herramienta.requisitos)) {
+    return finalizar('DENEGADO', 'SIN_PERMISO', fallo(MENSAJES.SIN_PERMISO), valores);
+  }
+
+  // 4b. Restricción de rol (campo opcional: solo aplica si la herramienta lo declara).
+  // Herramientas sin `requisitosRol` pasan siempre este punto sin cambios.
+  if (herramienta.requisitosRol && !herramienta.requisitosRol.includes(usuario?.role)) {
     return finalizar('DENEGADO', 'SIN_PERMISO', fallo(MENSAJES.SIN_PERMISO), valores);
   }
 
