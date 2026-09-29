@@ -76,6 +76,7 @@ const DASHBOARD_WIDGETS = {
   crm_metricas_contactos: {
     module: 'crm',
     sourceEndpoint: 'GET /api/crm/contactos/metricas',
+    requiresRole: ['Superadmin', 'Dirección', 'Director'],
     periods: ['month', '3m', '6m', '12m'],
     defaultPeriod: 'month',
     allowedChartTypes: ['kpi', 'bar', 'list'],
@@ -154,6 +155,7 @@ const DASHBOARD_WIDGETS = {
   crm_metricas_contactos_6m: {
     module: 'crm',
     sourceEndpoint: 'GET /api/crm/contactos/metricas',
+    requiresRole: ['Superadmin', 'Dirección', 'Director'],
     periods: ['6m'],
     defaultPeriod: '6m',
     allowedChartTypes: ['kpi', 'bar', 'list'],

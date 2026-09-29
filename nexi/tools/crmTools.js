@@ -16,6 +16,7 @@ const metricasCrm = {
     additionalProperties: false,
   },
   requisitos: [{ modulo: 'crm', permiso: 'lector' }],
+  requisitosRol: ['Superadmin', 'Dirección', 'Director'],
   alcance: 'AGREGADA',
   async handler(args, { hoy }) {
     const conPeriodo = args.mes !== undefined || args.anio !== undefined;
