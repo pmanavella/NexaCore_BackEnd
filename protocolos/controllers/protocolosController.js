@@ -47,6 +47,13 @@ class ProtocolosController {
     } catch (err) { next(err); }
   }
 
+  async eliminarProtocolo(req, res, next) {
+    try {
+      const data = await protocolosService.eliminarProtocolo(req.params.id);
+      res.json(data);
+    } catch (err) { next(err); }
+  }
+
   // ── PRUEBAS ────────────────────────────────────────────────
 
   async registrarPrueba(req, res, next) {

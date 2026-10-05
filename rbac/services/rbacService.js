@@ -1,7 +1,25 @@
 const supabase = require('../../config/supabase')
 const { validateUserName, validateEmail } = require('../../utils/validators')
+const { rolEsSeleccionable } = require('../config/jerarquia')
 
 class RbacService {
+  // Solo los roles activos (definitivos) pueden asignarse. Los legacy (ej. "Mando Medio")
+  // se conservan para los usuarios que ya los tienen, pero no se pueden elegir.
+  async _verificarRolAsignable(rolId) {
+    const { data: rol, error } = await supabase
+      .from('roles')
+      .select('*')
+      .eq('id', rolId)
+      .maybeSingle()
+    if (error) throw error
+    if (!rol) throw Object.assign(new Error('El rol indicado no existe.'), { status: 400 })
+    if (!rolEsSeleccionable(rol))
+      throw Object.assign(
+        new Error(`El rol "${rol.nombre}" ya no está disponible para asignar. Elegí uno de los roles vigentes.`),
+        { status: 400 }
+      )
+  }
+
   async listarUsuarios() {
     const { data, error } = await supabase
       .from('usuarios')
@@ -32,6 +50,8 @@ class RbacService {
 
     const emailErr = validateEmail(email)
     if (emailErr) throw Object.assign(new Error(emailErr), { status: 400 })
+
+    await this._verificarRolAsignable(rol_id)
 
     // Verificar email duplicado
     const { data: existing } = await supabase
@@ -95,6 +115,17 @@ class RbacService {
         .maybeSingle()
       if (existing)
         throw Object.assign(new Error('Ya existe un usuario registrado con este email.'), { status: 409 })
+    }
+
+    // Solo se valida si el rol cambia: un usuario legacy puede seguir editándose
+    // (el formulario reenvía su rol_id actual) hasta que se lo reasigne.
+    if (rol_id) {
+      const { data: actual } = await supabase
+        .from('usuarios')
+        .select('rol_id')
+        .eq('id', id)
+        .maybeSingle()
+      if (actual?.rol_id !== rol_id) await this._verificarRolAsignable(rol_id)
     }
 
     const { data, error } = await supabase

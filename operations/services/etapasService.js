@@ -1,6 +1,6 @@
 const supabase = require('../../config/supabase');
+const { TIPOS_BASE } = require('../config/etapas');
 
-const TIPOS_BASE = ['pendiente', 'en_curso', 'completada', 'cancelada'];
 const COLOR_HEX = /^#[0-9A-Fa-f]{6}$/;
 
 function validarNombre(nombre) {

@@ -1,4 +1,5 @@
 const supabase = require('../../config/supabase');
+const tareaAsignados = require('../../operations/services/tareaAsignados');
 
 // Acceso a datos de SOLO LECTURA usado por las herramientas de Nexi.
 // Cada método devuelve agregados o columnas explícitas mínimas: nunca `select('*')`,
@@ -56,18 +57,23 @@ class NexiDatos {
   }
 
   // Cantidad de usuarios (cualquier estado) cuyo nombre coincide exactamente.
-  // tareas.asignado_a guarda el nombre del usuario: solo es un identificador
-  // seguro si es único.
+  // Las tareas históricas sin vincular solo tienen el nombre en tareas.asignado_a:
+  // ese texto es un identificador seguro únicamente si el nombre es único.
   async contarUsuariosConNombre(nombre) {
     return contar('usuarios', q => q.eq('nombre', nombre));
   }
 
-  async tareasAbiertasAsignadasA(nombre, limite) {
+  // Tareas abiertas del usuario, incluidas las compartidas con otras personas
+  // (public.tarea_asignados) y las históricas asignadas solo por nombre.
+  async tareasAbiertasAsignadasA({ id, nombre }, limite) {
+    const ids = await tareaAsignados.idsTareasDePersona({ usuarioIds: id ? [id] : [], nombre });
+    if (!ids.length) return { filas: [], total: 0 };
+
     const { data, error, count } = await supabase
       .from('tareas')
       .select('titulo, estado, prioridad, fecha_limite', { count: 'exact' })
       .or('tipo.is.null,tipo.eq.asignacion')
-      .eq('asignado_a', nombre)
+      .in('id', ids)
       .in('estado', ['Pendiente', 'En Proceso'])
       .order('fecha_limite', { ascending: true, nullsFirst: false })
       .limit(limite);

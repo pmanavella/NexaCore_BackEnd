@@ -214,7 +214,7 @@ test('chat: si el modelo pide datos de otro usuario, la herramienta se deniega y
   assert.equal(turnosHerramienta[0].resultados[0].resultado.ok, false);
   assert.equal(turnosHerramienta[1].resultados[0].resultado.ok, true);
   assert.equal(tareas.mock.callCount(), 1);
-  assert.equal(tareas.mock.calls[0].arguments[0], 'Ana Pérez');
+  assert.deepEqual(tareas.mock.calls[0].arguments[0], { id: USUARIO.id, nombre: 'Ana Pérez' });
   assert.deepEqual(m.auditoria.mock.calls.map(c => c.arguments[0].estado), ['DENEGADO', 'OK']);
 });
 

@@ -7,9 +7,10 @@ const { requireRole } = require('../../middleware/rbacMiddleware')
 const soloAdmin      = requireRole('Dirección', 'Superadmin')
 const soloSuperadmin = requireRole('Superadmin')
 
-router.get('/perfil',                               ctrl.obtenerPerfil.bind(ctrl))
-
 router.use(authenticate)
+
+// Perfil del usuario de la sesión (identidad resuelta por authenticate, nunca por query params)
+router.get('/perfil',                               ctrl.obtenerPerfil.bind(ctrl))
 
 router.get('/usuarios',              soloAdmin,      ctrl.listarUsuarios.bind(ctrl))
 router.get('/usuarios/asignables',                   ctrl.listarUsuariosAsignables.bind(ctrl))
