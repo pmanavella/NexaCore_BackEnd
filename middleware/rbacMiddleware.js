@@ -12,6 +12,19 @@ function requireRole(...allowedRoles) {
   };
 }
 
+// requireHierarchy debe usarse DESPUÉS de authenticate.
+// Lee req.user.hierarchyLevel, derivado del rol por authMiddleware
+// (fuente de verdad: rbac/config/jerarquia.js). Ej: requireHierarchy(NIVELES_JERARQUICOS.HIGH).
+function requireHierarchy(...allowedLevels) {
+  return (req, res, next) => {
+    const nivel = req.user?.hierarchyLevel;
+    if (!nivel || !allowedLevels.includes(nivel)) {
+      return res.status(403).json({ error: 'No tenés permisos para realizar esta acción.' });
+    }
+    next();
+  };
+}
+
 // requireModuleAccess debe usarse DESPUÉS de authenticate.
 // Consulta la Matriz de permisos real (usuario_modulo_permisos > rol_modulo_permisos) para
 // req.user.id — nunca confía en rol/módulo enviado por query, body o headers del cliente.
@@ -67,4 +80,4 @@ function requireModulePermission(moduloNombre, nivelMinimo, moduloLabel = modulo
   };
 }
 
-module.exports = { requireRole, requireModuleAccess, requireModulePermission, resolverNivelPermiso };
+module.exports = { requireRole, requireHierarchy, requireModuleAccess, requireModulePermission, resolverNivelPermiso };

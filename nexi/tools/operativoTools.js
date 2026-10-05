@@ -3,10 +3,12 @@ const { PARAM_MES, PARAM_ANIO, resolverMes, denegar } = require('./comunes');
 
 // Herramientas de Operativo.
 // - resumen_operativo: solo conteos globales (sin títulos ni responsables).
-// - mis_tareas_pendientes: PERSONAL. tareas.asignado_a guarda el NOMBRE del
-//   usuario (no su id), así que el filtro usa siempre req.user.name y solo se
-//   ejecuta si ese nombre es único en public.usuarios. Si no lo es, se niega:
-//   no puede garantizarse que las tareas sean del usuario autenticado.
+// - mis_tareas_pendientes: PERSONAL. Usa siempre la identidad de la sesión
+//   (req.user.id + req.user.name): tareas vinculadas al usuario en
+//   tarea_asignados (incluidas las compartidas) más las históricas que solo
+//   tienen su NOMBRE en tareas.asignado_a. Por esas últimas solo se ejecuta si
+//   el nombre es único en public.usuarios; si no lo es, se niega: no puede
+//   garantizarse que las tareas sean del usuario autenticado.
 
 const ESTADOS = ['Pendiente', 'En Proceso', 'Completada', 'Cancelada'];
 const PRIORIDADES = ['Baja', 'Media', 'Alta', 'Urgente'];
@@ -72,7 +74,7 @@ const misTareasPendientes = {
       );
     }
 
-    const { filas, total } = await nexiDatos.tareasAbiertasAsignadasA(nombre, args.limite ?? 10);
+    const { filas, total } = await nexiDatos.tareasAbiertasAsignadasA({ id: usuario.id, nombre }, args.limite ?? 10);
     return {
       total_abiertas: total,
       mostradas: filas.length,

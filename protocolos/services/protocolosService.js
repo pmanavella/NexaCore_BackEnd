@@ -124,6 +124,39 @@ class ProtocolosService {
     return nuevosItems ?? [];
   }
 
+  // Eliminación definitiva del protocolo completo. protocolo_items y
+  // protocolo_pruebas tienen FK ON DELETE CASCADE hacia protocolos (definidas
+  // al crear el módulo), así que un único DELETE borra todo de forma atómica.
+  // Para ocultarlo de forma reversible existe `activo: false` vía PUT.
+  async eliminarProtocolo(id) {
+    const { data: protocolo } = await supabase
+      .from('protocolos')
+      .select('id, nombre')
+      .eq('id', id)
+      .maybeSingle();
+    if (!protocolo) throw Object.assign(new Error('Protocolo no encontrado'), { status: 404 });
+
+    const { count: registros, error: countErr } = await supabase
+      .from('protocolo_pruebas')
+      .select('id', { count: 'exact', head: true })
+      .eq('protocolo_id', id);
+    if (countErr) throw countErr;
+
+    const { error } = await supabase.from('protocolos').delete().eq('id', id);
+    if (error) {
+      if (error.code === '23503')
+        throw Object.assign(new Error('No se puede eliminar el protocolo porque tiene registros asociados.'), { status: 409 });
+      throw error;
+    }
+
+    return {
+      message: 'Protocolo eliminado correctamente',
+      id: protocolo.id,
+      nombre: protocolo.nombre,
+      registrosEliminados: registros ?? 0,
+    };
+  }
+
   // ── PRUEBAS ────────────────────────────────────────────────
 
   async registrarPrueba(protocoloId, body, user) {
@@ -197,7 +230,7 @@ class ProtocolosService {
       .select('*, protocolos(id, nombre, categoria)')
       .eq('id', pruebaId)
       .single();
-    if (error) throw Object.assign(new Error('Prueba no encontrada'), { status: 404 });
+    if (error) throw Object.assign(new Error('Registro no encontrado'), { status: 404 });
     return data;
   }
 

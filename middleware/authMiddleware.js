@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const { resolverNivelJerarquico } = require('../rbac/config/jerarquia');
 
 async function authenticate(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -16,7 +17,9 @@ async function authenticate(req, res, next) {
 
     const { data: profile, error: profileError } = await supabase
       .from('usuarios')
-      .select('id, nombre, roles(nombre)')
+      // roles(*) y no roles(nombre, nivel_jerarquico): si el backend se despliega
+      // antes de la migración, pedir una columna inexistente rompería el login.
+      .select('id, nombre, roles(*)')
       .eq('email', user.email)
       .eq('estado', 'Activo')
       .single();
@@ -30,6 +33,7 @@ async function authenticate(req, res, next) {
       email: user.email,
       name: profile.nombre,
       role: profile.roles?.nombre ?? null,
+      hierarchyLevel: resolverNivelJerarquico(profile.roles),
     };
 
     next();

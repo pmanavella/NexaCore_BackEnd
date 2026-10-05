@@ -1,5 +1,4 @@
 const rbacService = require('../services/rbacService')
-const supabase = require('../../config/supabase')
 
 class RbacController {
   async listarUsuarios(req, res, next) {
@@ -51,36 +50,17 @@ class RbacController {
     } catch (err) { next(err) }
   }
 
-  async obtenerPerfil(req, res, next) {
-    try {
-      const email = req.query.email?.trim().toLowerCase()
-  
-      if (!email) {
-        return res.status(400).json({
-          error: 'El parámetro email es requerido.'
-        })
-      }
-  
-      const { data, error } = await supabase
-        .from('usuarios')
-        .select('nombre, roles(nombre)')
-        .eq('email', email)
-        .eq('estado', 'Activo')
-        .single()
-  
-      if (error || !data) {
-        return res.status(403).json({
-          error: 'Usuario no encontrado o inactivo en el sistema.'
-        })
-      }
-  
-      res.json({
-        nombre: data.nombre,
-        rol: data.roles?.nombre ?? null
-      })
-    } catch (err) {
-      next(err)
-    }
+  // Perfil del usuario autenticado. authenticate ya resolvió req.user desde
+  // public.usuarios (solo usuarios activos) a partir del token: no se acepta
+  // ningún identificador enviado por el cliente (?email= se ignora).
+  obtenerPerfil(req, res) {
+    const { id, name, role, hierarchyLevel } = req.user
+    res.json({
+      id, // public.usuarios.id (no el UID de auth.users)
+      nombre: name,
+      rol: role,
+      hierarchyLevel,
+    })
   }
 
 

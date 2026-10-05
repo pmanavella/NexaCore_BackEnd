@@ -437,7 +437,7 @@ test('mis_tareas_pendientes (PERSONAL): filtra por el usuario de la sesión', as
   const { estado, resultado } = await ejecutar('mis_tareas_pendientes', { limite: 5 });
   assert.equal(estado, 'OK');
   assert.equal(conteo.mock.calls[0].arguments[0], 'Ana Pérez');
-  assert.deepEqual(tareas.mock.calls[0].arguments, ['Ana Pérez', 5]);
+  assert.deepEqual(tareas.mock.calls[0].arguments, [{ id: USUARIO.id, nombre: 'Ana Pérez' }, 5]);
   assert.deepEqual(resultado.datos.tareas[0], {
     titulo: 'Revisar informe', estado: 'Pendiente', prioridad: 'Alta', fecha_limite: '2026-09-20', vencida: true,
   });

@@ -1,12 +1,15 @@
 const supabase = require('../../config/supabase')
+const { NIVELES_JERARQUICOS, resolverNivelJerarquico } = require('../../rbac/config/jerarquia')
 
 const NIVEL_PERMISO = { sin_acceso: 0, lector: 1, editor: 2, administrador: 3 }
 
+// roles(*) incluye nivel_jerarquico/activo una vez corrida la migración de roles,
+// sin romper la consulta si todavía no existen.
 const SELECT_NODO = `
   id, usuario_id, empleado_id, superior_id, nivel, area, cargo,
   es_externo, fecha_inicio, fecha_fin, activo, created_at, updated_at,
   nombre_manual, apellido_manual, email_manual, telefono_manual,
-  usuarios (id, nombre, email, estado, roles(id, nombre)),
+  usuarios (id, nombre, email, estado, roles(*)),
   empleados (id, nombre, apellido, email, telefono, estado)
 `
 
@@ -24,7 +27,17 @@ function normalizarTexto(valor) {
   return trimmed === '' ? null : trimmed
 }
 
-// Determina el origen de un nodo para que el frontend sepa cómo renderizarlo.
+// Nivel jerárquico de un nodo: siempre derivado del rol del usuario vinculado.
+// Nodos sin usuario (empleado/manual) no tienen rol: NONE si están marcados
+// como externos, null en otro caso. No se infiere nada de superior_id ni de `nivel`.
+function nivelJerarquicoNodo(nodo) {
+  const rol = nodo.usuarios?.roles
+  if (rol) return resolverNivelJerarquico(rol)
+  return nodo.es_externo ? NIVELES_JERARQUICOS.NONE : null
+}
+
+// Determina el origen de un nodo para que el frontend sepa cómo renderizarlo,
+// y expone rol + nivel jerárquico para ubicarlo en el organigrama.
 function agregarOrigen(nodo) {
   if (!nodo) return nodo
   let origen
@@ -32,7 +45,12 @@ function agregarOrigen(nodo) {
   else if (nodo.usuario_id) origen = 'usuario'
   else if (nodo.empleado_id) origen = 'empleado'
   else origen = 'manual'
-  return { ...nodo, origen }
+  return {
+    ...nodo,
+    origen,
+    rol: nodo.usuarios?.roles?.nombre ?? null,
+    hierarchyLevel: nivelJerarquicoNodo(nodo),
+  }
 }
 
 // Traduce violaciones de unicidad de Postgres (23505) a mensajes claros.
@@ -564,7 +582,7 @@ class OrganizacionService {
     const [usuariosRes, empleadosRes, nodosRes] = await Promise.all([
       supabase
         .from('usuarios')
-        .select('id, nombre, email, estado, roles(id, nombre)')
+        .select('id, nombre, email, estado, roles(*)')
         .eq('estado', 'Activo')
         .order('nombre'),
       supabase
@@ -611,6 +629,7 @@ class OrganizacionService {
           apellido: empMatch.apellido,
           email: usr.email,
           rol: usr.roles?.nombre ?? null,
+          hierarchyLevel: resolverNivelJerarquico(usr.roles),
         })
       } else {
         resultado.push({
@@ -621,6 +640,7 @@ class OrganizacionService {
           apellido: null,
           email: usr.email,
           rol: usr.roles?.nombre ?? null,
+          hierarchyLevel: resolverNivelJerarquico(usr.roles),
         })
       }
     }
@@ -635,6 +655,7 @@ class OrganizacionService {
         apellido: emp.apellido,
         email: emp.email,
         rol: null,
+        hierarchyLevel: null,
       })
     }
 
