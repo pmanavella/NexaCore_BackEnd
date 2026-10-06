@@ -159,6 +159,10 @@ class ProtocolosService {
 
   // ── PRUEBAS ────────────────────────────────────────────────
 
+  // Cada resultado lleva el `estado` del ítem (ok/fail/na) y, opcionalmente,
+  // `tildado` (boolean): si el ítem se marcó en el checklist de la prueba.
+  // Se guarda siempre como boolean (false si no viene). Las pruebas registradas
+  // antes de existir el tilde no tienen este campo.
   async registrarPrueba(protocoloId, body, user) {
     const { fecha, resultados, observaciones, resultado_texto } = body;
 
@@ -177,7 +181,10 @@ class ProtocolosService {
         throw Object.assign(new Error('Cada resultado requiere item_id y estado'), { status: 400 });
       if (!ESTADOS_VALIDOS.includes(r.estado))
         throw Object.assign(new Error(`Estado inválido: ${r.estado}. Valores permitidos: ${ESTADOS_VALIDOS.join(', ')}`), { status: 400 });
+      if (r.tildado !== undefined && typeof r.tildado !== 'boolean')
+        throw Object.assign(new Error('"tildado" debe ser true o false'), { status: 400 });
     }
+    const resultadosConTilde = resultados.map(r => ({ ...r, tildado: r.tildado === true }));
 
     const obs = observaciones?.trim() || null;
     if (obs && obs.length > 800)
@@ -195,7 +202,7 @@ class ProtocolosService {
         protocolo_id: protocoloId,
         realizado_por,
         fecha: fecha || new Date().toISOString().split('T')[0],
-        resultados,
+        resultados: resultadosConTilde,
         observaciones: obs,
         resultado_texto: resTexto,
         created_by: user?.id || null,
