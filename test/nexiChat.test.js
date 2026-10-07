@@ -20,6 +20,8 @@ const { LIMITES } = require('../nexi/config/nexi');
 
 const AHORA = new Date('2026-09-27T15:00:00Z');
 const USUARIO = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'ana@nexacore.test', name: 'Ana Pérez', role: 'Empleado' };
+// metricas_crm exige además uno de los roles habilitados del CRM.
+const DIRECTORA = { ...USUARIO, role: 'Dirección' };
 const OTRO_USUARIO = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const CONV_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
@@ -104,8 +106,11 @@ function prepararChat(t, { conversacion = { id: CONV_ID, titulo: 'Consulta' }, h
       id: 'msg-1', rol: 'asistente', contenido: respuesta, created_at: 'ts',
     })),
     eliminarSiVacia: t.mock.method(conversacionesService, 'eliminarSiVacia', async () => {}),
-    permisos: t.mock.method(organizacionService, 'obtenerPermisosUsuario', async () => Object.entries(niveles).map(([nombre, permiso]) => ({
-      permiso, source: 'usuario', modulos: { nombre, label: nombre },
+    // Cada nivel puede ser 'lector' (alcance global) o { permiso, alcance }.
+    permisos: t.mock.method(organizacionService, 'obtenerPermisosUsuario', async () => Object.entries(niveles).map(([nombre, v]) => ({
+      permiso: typeof v === 'string' ? v : v.permiso,
+      alcance: typeof v === 'string' ? 'global' : v.alcance,
+      source: 'usuario', modulos: { nombre, label: nombre },
     }))),
     auditoria: t.mock.method(auditoriaService, 'registrar', async () => {}),
   };
@@ -130,7 +135,7 @@ test('chat: usa herramienta, devuelve respuesta final y guarda el intercambio', 
     { texto: 'Hay 4 contactos.', llamadas: [], crudo: null },
   );
 
-  const r = await nexiService.chat({ usuario: USUARIO, conversationId: CONV_ID, mensaje: '  ¿Cuántos contactos hay? ', ahora: AHORA });
+  const r = await nexiService.chat({ usuario: DIRECTORA, conversationId: CONV_ID, mensaje: '  ¿Cuántos contactos hay? ', ahora: AHORA });
   assert.equal(r.conversationId, CONV_ID);
   assert.equal(r.mensaje.contenido, 'Hay 4 contactos.');
   assert.deepEqual(r.herramientasUsadas, ['metricas_crm']);
@@ -225,7 +230,7 @@ test('chat: límite de rondas de herramientas → mensaje controlado, sin loop i
   const generar = respuestas(t, () => ({ texto: '', llamadas: [{ id: 'c', nombre: 'metricas_crm', argumentos: {} }], crudo: {} }));
   t.mock.method(console, 'warn', () => {});
 
-  const r = await nexiService.chat({ usuario: USUARIO, conversationId: CONV_ID, mensaje: 'loop' });
+  const r = await nexiService.chat({ usuario: DIRECTORA, conversationId: CONV_ID, mensaje: 'loop' });
   assert.equal(r.mensaje.contenido, nexiService.MENSAJE_LIMITE_HERRAMIENTAS);
   assert.equal(generar.mock.callCount(), LIMITES.MAX_ITERACIONES_HERRAMIENTAS + 1);
   assert.equal(ejecutar.mock.callCount(), LIMITES.MAX_ITERACIONES_HERRAMIENTAS);
@@ -274,7 +279,7 @@ test('chat sin contextoModulo: se ofrecen todas las herramientas permitidas y no
     { texto: '', llamadas: [{ id: 'c1', nombre: 'metricas_crm', argumentos: {} }], crudo: {} },
     { texto: 'ok', llamadas: [], crudo: null },
   );
-  await nexiService.chat({ usuario: USUARIO, conversationId: CONV_ID, mensaje: 'hola' });
+  await nexiService.chat({ usuario: DIRECTORA, conversationId: CONV_ID, mensaje: 'hola' });
   const ofrecidas = generar.mock.calls[0].arguments[0].herramientas.map(h => h.nombre).sort();
   assert.deepEqual(ofrecidas, ['flujo_financiero', 'metricas_crm', 'mis_tareas_pendientes', 'proximos_vencimientos', 'resumen_finanzas', 'resumen_operativo', 'total_movimientos_periodo']);
   assert.equal(ejecutar.mock.calls[0].arguments[0].herramientasPermitidas, null);
@@ -304,7 +309,7 @@ test('chat con contextoModulo: el modelo no puede usar herramientas de otro mód
     { texto: '', llamadas: [{ id: 'c1', nombre: 'metricas_crm', argumentos: {} }], crudo: {} },
     { texto: 'No puedo.', llamadas: [], crudo: null },
   );
-  const r = await nexiService.chat({ usuario: USUARIO, conversationId: CONV_ID, mensaje: 'contactos', contextoModulo: 'finance' });
+  const r = await nexiService.chat({ usuario: DIRECTORA, conversationId: CONV_ID, mensaje: 'contactos', contextoModulo: 'finance' });
   assert.deepEqual(r.herramientasUsadas, []);
   assert.equal(contactos.mock.callCount(), 0);
   assert.equal(m.auditoria.mock.calls[0].arguments[0].motivo, 'FUERA_DE_CONTEXTO');

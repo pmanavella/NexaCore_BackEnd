@@ -22,23 +22,31 @@ const metricasCrm = {
     const conPeriodo = args.mes !== undefined || args.anio !== undefined;
     const periodo = conPeriodo ? resolverMes(args, hoy) : null;
     // contactos.created_at es timestamptz: se ancla a UTC, igual que crmService.
-    const rango = periodo
-      ? { desde: `${periodo.desde}T00:00:00.000Z`, hasta: `${periodo.hasta}T00:00:00.000Z` }
-      : {};
-
-    const [total, porTipo, porEstado] = await Promise.all([
-      nexiDatos.contarContactos(rango),
-      Promise.all(TIPOS.map(tipo => nexiDatos.contarContactos({ ...rango, tipo }))),
-      Promise.all(ESTADOS.map(estado => nexiDatos.contarContactos({ ...rango, estado }))),
-    ]);
+    const rango = periodo ? { desde: periodo.desde, hasta: periodo.hasta } : {};
 
     return {
       periodo: periodo ? { clave: periodo.clave, criterio: 'contactos creados en el mes' } : 'todos los contactos',
-      total,
-      por_tipo: Object.fromEntries(TIPOS.map((t, i) => [t, porTipo[i]])),
-      por_estado: Object.fromEntries(ESTADOS.map((e, i) => [e, porEstado[i]])),
+      ...(await conteosContactos(rango)),
     };
   },
 };
 
+// Conteos agregados de contactos (opcionalmente creados en [desde, hasta) de
+// fechas YYYY-MM-DD). Reutilizado por Dashboard y Reportes.
+async function conteosContactos({ desde, hasta } = {}) {
+  const rango = desde && hasta ? { desde: `${desde}T00:00:00.000Z`, hasta: `${hasta}T00:00:00.000Z` } : {};
+  const [total, porTipo, porEstado] = await Promise.all([
+    nexiDatos.contarContactos(rango),
+    Promise.all(TIPOS.map(tipo => nexiDatos.contarContactos({ ...rango, tipo }))),
+    Promise.all(ESTADOS.map(estado => nexiDatos.contarContactos({ ...rango, estado }))),
+  ]);
+  return {
+    total,
+    por_tipo: Object.fromEntries(TIPOS.map((t, i) => [t, porTipo[i]])),
+    por_estado: Object.fromEntries(ESTADOS.map((e, i) => [e, porEstado[i]])),
+  };
+}
+
 module.exports = [metricasCrm];
+module.exports.conteosContactos = conteosContactos;
+module.exports.REQUISITOS_ROL_CRM = metricasCrm.requisitosRol;
