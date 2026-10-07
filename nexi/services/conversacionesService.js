@@ -65,16 +65,19 @@ class ConversacionesService {
     return data;
   }
 
+  // Últimos N mensajes de la conversación, devueltos en orden cronológico.
+  // Se piden en orden descendente para que el límite recorte los más viejos
+  // (no los más recientes) y se invierten antes de responder.
   async listarMensajes(conversacionId, usuarioId) {
     const conversacion = await this.obtenerPropia(conversacionId, usuarioId);
     const { data, error } = await supabase
       .from('nexi_mensajes')
       .select('id, rol, contenido, created_at')
       .eq('conversacion_id', conversacion.id)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(LIMITES.MAX_MENSAJES_LISTADO);
     if (error) throw error;
-    return { conversacion, data: data || [] };
+    return { conversacion, data: (data || []).reverse() };
   }
 
   // Últimos N mensajes (orden cronológico) para enviar como historial al modelo.

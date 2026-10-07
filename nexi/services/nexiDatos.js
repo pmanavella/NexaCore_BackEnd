@@ -81,6 +81,58 @@ class NexiDatos {
     return { filas: data || [], total: count || 0 };
   }
 
+  // Ids de tareas vinculadas a un conjunto de usuarios (tarea_asignados) y,
+  // opcionalmente, a un nombre histórico en tareas.asignado_a. Reutiliza la
+  // misma regla que el módulo Operativo (tareaAsignados.idsTareasDePersona).
+  async idsTareasDeUsuarios(usuarioIds, nombreLegacy = null) {
+    return tareaAsignados.idsTareasDePersona({ usuarioIds, nombre: nombreLegacy || undefined });
+  }
+
+  // Columnas mínimas de tareas para contar en memoria cuando el alcance está
+  // restringido a un conjunto de ids. Se consulta en lotes para no exceder el
+  // largo de URL de PostgREST con `in(...)`.
+  async filasTareasPorIds(ids) {
+    const filas = [];
+    for (let i = 0; i < ids.length; i += 150) {
+      const { data, error } = await supabase
+        .from('tareas')
+        .select('id, estado, prioridad, fecha_limite, tipo')
+        .in('id', ids.slice(i, i + 150));
+      if (error) throw error;
+      filas.push(...(data || []));
+    }
+    return filas;
+  }
+
+  // Ejecuciones (registros) de protocolos en [desde, hasta) por `fecha`, con
+  // columnas explícitas. protocolosService solo lista por protocolo; este
+  // método cubre las consultas por período. Filtros opcionales: protocolos y
+  // creadores (alcance). Devuelve como máximo `limite` filas más el total real.
+  async pruebasProtocolos({ desde, hasta, protocoloIds, creadores, limite = 500 } = {}) {
+    let query = supabase
+      .from('protocolo_pruebas')
+      .select('id, protocolo_id, fecha, realizado_por, resultados, observaciones, resultado_texto, action_items, created_by', { count: 'exact' })
+      .order('fecha', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(limite);
+    if (desde) query = query.gte('fecha', desde);
+    if (hasta) query = query.lt('fecha', hasta);
+    if (protocoloIds) query = query.in('protocolo_id', protocoloIds);
+    if (creadores) query = query.in('created_by', creadores);
+    const { data, error, count } = await query;
+    if (error) throw error;
+    return { filas: data || [], total: count ?? (data || []).length };
+  }
+
+  // Nombres de usuarios del sistema por id (para mostrar "creado por").
+  async nombresUsuarios(ids) {
+    const validos = [...new Set(ids.filter(Boolean))];
+    if (!validos.length) return new Map();
+    const { data, error } = await supabase.from('usuarios').select('id, nombre').in('id', validos);
+    if (error) throw error;
+    return new Map((data || []).map(u => [u.id, u.nombre]));
+  }
+
   async contarContactos(filtros = {}) {
     return contar('contactos', q => {
       let query = q;

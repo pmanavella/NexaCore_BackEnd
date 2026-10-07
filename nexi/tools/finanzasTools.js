@@ -33,9 +33,12 @@ function aLista(mapa) {
     .sort((a, b) => b.total - a.total);
 }
 
+// Variación porcentual respecto del valor anterior. Se divide por el valor
+// absoluto para que el signo indique siempre si el valor subió o bajó (un
+// balance que pasa de -100 a 50 "sube" +150 %, no -150 %).
 function variacionPct(actual, anterior) {
   if (!anterior) return null;
-  return redondear((actual - anterior) / anterior * 100);
+  return redondear((actual - anterior) / Math.abs(anterior) * 100);
 }
 
 const resumenFinanzas = {
@@ -237,4 +240,29 @@ const totalMovimientosPeriodo = {
   },
 };
 
+// Totales de un conjunto de meses consecutivos [{ clave, desde, hasta }] en UNA
+// consulta agregada: por mes y para todo el bloque (con desglose por categoría).
+// Reutilizado por Dashboard y Reportes para no duplicar el cálculo.
+async function totalesDeMeses(meses) {
+  const filas = await nexiDatos.totalesMovimientos(meses[0].desde, meses[meses.length - 1].hasta);
+  const porMes = meses.map(m => {
+    const t = totalesDelRango(filas, m.desde, m.hasta);
+    return { mes: m.clave, ingresos: redondear(t.ingresos), gastos: redondear(t.gastos), balance: redondear(t.ingresos - t.gastos) };
+  });
+  const total = totalesDelRango(filas, meses[0].desde, meses[meses.length - 1].hasta);
+  return {
+    porMes,
+    ingresos: redondear(total.ingresos),
+    gastos: redondear(total.gastos),
+    balance: redondear(total.ingresos - total.gastos),
+    ingresosPorCategoria: aLista(total.ingresosPorCategoria),
+    gastosPorCategoria: aLista(total.gastosPorCategoria),
+  };
+}
+
 module.exports = [resumenFinanzas, flujoFinanciero, proximosVencimientos, totalMovimientosPeriodo];
+module.exports.totalesDeMeses = totalesDeMeses;
+module.exports.variacionPct = variacionPct;
+module.exports.totalesDelRango = totalesDelRango;
+module.exports.aLista = aLista;
+module.exports.MAX_VENCIMIENTOS = MAX_VENCIMIENTOS;

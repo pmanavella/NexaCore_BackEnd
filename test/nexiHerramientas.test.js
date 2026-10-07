@@ -14,15 +14,22 @@ const suscripcionesService = require('../finance/services/suscripcionesService')
 // 27/09/2026 12:00 en Argentina.
 const AHORA = new Date('2026-09-27T15:00:00Z');
 const USUARIO = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'ana@nexacore.test', name: 'Ana Pérez', role: 'Empleado' };
+// metricas_crm exige además uno de los roles habilitados del CRM.
+const DIRECTORA = { ...USUARIO, role: 'Dirección' };
 const IND_ID = '11111111-1111-4111-8111-111111111111';
 
 // Permisos con la forma de organizacionService.obtenerPermisosUsuario.
+// Cada nivel puede ser 'lector' (alcance global) o { permiso, alcance }.
 function permisos(niveles) {
-  return ['finance', 'indicadores', 'operations', 'crm', 'rbac'].map(nombre => ({
-    permiso: niveles[nombre] || 'sin_acceso',
-    source: niveles[nombre] ? 'usuario' : 'ninguno',
-    modulos: { nombre, label: nombre },
-  }));
+  return ['finance', 'indicadores', 'operations', 'crm', 'rbac'].map(nombre => {
+    const v = niveles[nombre];
+    return {
+      permiso: (typeof v === 'string' ? v : v?.permiso) || 'sin_acceso',
+      alcance: typeof v === 'string' ? 'global' : (v?.alcance ?? null),
+      source: v ? 'usuario' : 'ninguno',
+      modulos: { nombre, label: nombre },
+    };
+  });
 }
 
 const TODOS = { finance: 'lector', indicadores: 'lector', operations: 'lector', crm: 'lector' };
@@ -42,9 +49,14 @@ function ejecutar(nombre, argumentos = {}, usuario = USUARIO) {
 test('registro: solo herramientas de lectura, esquemas cerrados y sin herramientas genéricas', () => {
   const nombres = [...registry._REGISTRO.keys()].sort();
   assert.deepEqual(nombres, [
-    'flujo_financiero', 'historico_indicador', 'listar_indicadores', 'metricas_crm', 'mis_tareas_pendientes',
-    'proximos_vencimientos', 'resumen_finanzas', 'resumen_operativo', 'total_movimientos_periodo', 'valor_indicador',
+    'buscar_puesto', 'catalogo_dashboard', 'datos_widget_dashboard', 'detalle_protocolo', 'ejecuciones_protocolos',
+    'estado_modulo_reportes', 'estructura_organizacion', 'flujo_financiero', 'generar_reporte', 'historico_indicador',
+    'listar_indicadores', 'listar_protocolos', 'metricas_crm', 'mi_dashboard', 'mi_equipo', 'mi_posicion_organigrama',
+    'mis_reportes', 'mis_tareas_pendientes', 'proximos_vencimientos', 'resumen_dashboard', 'resumen_finanzas',
+    'resumen_operativo', 'resumen_protocolos', 'tipos_de_reporte', 'total_movimientos_periodo', 'valor_indicador',
   ]);
+  // La única herramienta que no es de lectura es la de generación de reportes.
+  assert.deepEqual([...registry._REGISTRO.values()].filter(h => h.efecto !== 'LECTURA').map(h => h.nombre), ['generar_reporte']);
   for (const h of registry._REGISTRO.values()) {
     assert.equal(h.parametros.additionalProperties, false, h.nombre);
     assert.ok(h.requisitos.every(r => r.permiso === 'lector'), h.nombre);
@@ -72,15 +84,36 @@ test('registro: rechaza definiciones genéricas o con parámetros de identidad',
 
 test('herramientasDisponibles: el backend filtra por la Matriz de permisos', () => {
   const niveles = new Map([
-    ['finance', { nivel: 'lector' }],
+    ['finance', { nivel: 'lector', alcance: 'global' }],
     ['crm', { nivel: 'sin_acceso' }],
-    ['indicadores', { nivel: 'lector' }],
+    ['indicadores', { nivel: 'lector', alcance: 'global' }],
   ]);
-  const nombres = registry.herramientasDisponibles(niveles).map(h => h.nombre).sort();
+  const nombres = registry.herramientasDisponibles(niveles, null, USUARIO).map(h => h.nombre).sort();
   assert.deepEqual(nombres, ['flujo_financiero', 'historico_indicador', 'listar_indicadores', 'proximos_vencimientos', 'resumen_finanzas', 'total_movimientos_periodo', 'valor_indicador']);
   // Indicadores sin Finanzas: puede listar, pero no calcular valores.
-  const soloInd = registry.herramientasDisponibles(new Map([['indicadores', { nivel: 'lector' }]])).map(h => h.nombre);
+  const soloInd = registry.herramientasDisponibles(new Map([['indicadores', { nivel: 'lector', alcance: 'global' }]]), null, USUARIO).map(h => h.nombre);
   assert.deepEqual(soloInd, ['listar_indicadores']);
+});
+
+test('herramientasDisponibles: requisitosRol se aplica al OFRECER (metricas_crm solo con rol habilitado)', () => {
+  const niveles = new Map([['crm', { nivel: 'lector', alcance: 'global' }]]);
+  const nombres = u => registry.herramientasDisponibles(niveles, null, u).map(h => h.nombre);
+  assert.deepEqual(nombres(USUARIO), []);
+  assert.deepEqual(nombres(DIRECTORA), ['metricas_crm']);
+  assert.deepEqual(nombres({ ...USUARIO, role: 'Superadmin' }), ['metricas_crm']);
+  // Sin usuario (o sin rol) una herramienta con requisitosRol nunca se ofrece.
+  assert.deepEqual(nombres(null), []);
+  assert.deepEqual(nombres({ ...USUARIO, role: null }), []);
+});
+
+test('rol incorrecto: aunque el modelo la invoque, metricas_crm se deniega en la ejecución (segunda capa)', async (t) => {
+  const { auditoria } = preparar(t, { crm: 'lector' });
+  const contar = t.mock.method(nexiDatos, 'contarContactos', async () => 1);
+  const r = await ejecutar('metricas_crm', {}, USUARIO);
+  assert.equal(r.estado, 'DENEGADO');
+  assert.equal(r.motivo, 'SIN_PERMISO');
+  assert.equal(contar.mock.callCount(), 0);
+  assert.equal(auditoria.mock.calls[0].arguments[0].estado, 'DENEGADO');
 });
 
 // ── Autorización por llamada ────────────────────────────────────────────────
@@ -134,9 +167,9 @@ test('los permisos se releen en cada llamada (un permiso revocado se aplica de i
   let nivel = 'lector';
   const permisosMock = t.mock.method(organizacionService, 'obtenerPermisosUsuario', async () => permisos({ crm: nivel }));
 
-  assert.equal((await ejecutar('metricas_crm')).estado, 'OK');
+  assert.equal((await ejecutar('metricas_crm', {}, DIRECTORA)).estado, 'OK');
   nivel = 'sin_acceso';
-  assert.equal((await ejecutar('metricas_crm')).estado, 'DENEGADO');
+  assert.equal((await ejecutar('metricas_crm', {}, DIRECTORA)).estado, 'DENEGADO');
   assert.equal(permisosMock.mock.callCount(), 2);
   assert.equal(permisosMock.mock.calls[0].arguments[0], USUARIO.id);
 });
@@ -466,7 +499,7 @@ test('metricas_crm: solo conteos por tipo y estado, sin datos personales', async
     if (!f.tipo && !f.estado) return 12;
     return 1;
   });
-  const { resultado } = await ejecutar('metricas_crm', { mes: 9, anio: 2026 });
+  const { resultado } = await ejecutar('metricas_crm', { mes: 9, anio: 2026 }, DIRECTORA);
   const d = resultado.datos;
   assert.equal(d.total, 12);
   assert.equal(d.por_tipo.Cliente, 7);
@@ -489,19 +522,20 @@ test('foco: toda herramienta pertenece a un módulo admitido como contextoModulo
 });
 
 test('foco: herramientasDisponibles solo restringe, nunca amplía permisos', () => {
-  const todos = new Map(Object.keys(TODOS).map(m => [m, { nivel: 'lector' }]));
-  const nombres = (niveles, modulo) => registry.herramientasDisponibles(niveles, modulo).map(h => h.nombre).sort();
+  const todos = new Map(Object.keys(TODOS).map(m => [m, { nivel: 'lector', alcance: 'global' }]));
+  const nombres = (niveles, modulo) => registry.herramientasDisponibles(niveles, modulo, DIRECTORA).map(h => h.nombre).sort();
 
   assert.deepEqual(nombres(todos, 'finance'), ['flujo_financiero', 'proximos_vencimientos', 'resumen_finanzas', 'total_movimientos_periodo']);
   assert.deepEqual(nombres(todos, 'crm'), ['metricas_crm']);
   assert.deepEqual(nombres(todos, 'operations'), ['mis_tareas_pendientes', 'resumen_operativo']);
   assert.deepEqual(nombres(todos, 'indicadores'), ['historico_indicador', 'listar_indicadores', 'valor_indicador']);
   // Indicadores sin Finanzas: el foco no evita exigir ambos permisos
-  assert.deepEqual(nombres(new Map([['indicadores', { nivel: 'lector' }]]), 'indicadores'), ['listar_indicadores']);
+  assert.deepEqual(nombres(new Map([['indicadores', { nivel: 'lector', alcance: 'global' }]]), 'indicadores'), ['listar_indicadores']);
   // Foco en un módulo sin permiso → ninguna herramienta
-  assert.deepEqual(nombres(new Map([['crm', { nivel: 'lector' }]]), 'finance'), []);
-  // Sin foco: comportamiento previo
-  assert.equal(registry.herramientasDisponibles(todos).length, registry._REGISTRO.size);
+  assert.deepEqual(nombres(new Map([['crm', { nivel: 'lector', alcance: 'global' }]]), 'finance'), []);
+  // Sin foco: todas las herramientas de esos módulos
+  assert.equal(registry.herramientasDisponibles(todos, null, DIRECTORA).length,
+    [...registry._REGISTRO.values()].filter(h => h.requisitos.every(r => todos.has(r.modulo))).length);
 });
 
 test('foco: ejecutar deniega herramientas fuera del conjunto ofrecido aunque haya permiso', async (t) => {
