@@ -70,6 +70,20 @@ class ProtocolosController {
     } catch (err) { next(err); }
   }
 
+  async actualizarPrueba(req, res, next) {
+    try {
+      const data = await protocolosService.actualizarPrueba(req.params.id, req.params.pruebaId, req.body);
+      res.json(data);
+    } catch (err) { next(err); }
+  }
+
+  async eliminarPrueba(req, res, next) {
+    try {
+      const data = await protocolosService.eliminarPrueba(req.params.id, req.params.pruebaId);
+      res.json(data);
+    } catch (err) { next(err); }
+  }
+
   async obtenerPrueba(req, res, next) {
     try {
       const data = await protocolosService.obtenerPrueba(req.params.pruebaId);

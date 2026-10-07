@@ -27,5 +27,7 @@ router.delete('/:id', soloMandoAlto, ctrl.eliminarProtocolo.bind(ctrl));
 // ── Pruebas de un protocolo ───────────────────────────────────
 router.post('/:id/pruebas', ctrl.registrarPrueba.bind(ctrl));
 router.get('/:id/pruebas', ctrl.listarPruebas.bind(ctrl));
+router.put('/:id/pruebas/:pruebaId', ctrl.actualizarPrueba.bind(ctrl));
+router.delete('/:id/pruebas/:pruebaId', ctrl.eliminarPrueba.bind(ctrl));
 
 module.exports = router;
