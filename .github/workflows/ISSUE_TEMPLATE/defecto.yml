@@ -1,0 +1,94 @@
+name: Defecto
+description: Registrar un defecto del módulo Financiero
+title: "[DEF-NNN] "
+labels: ["defecto", "estado: nuevo"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Antes de enviar, tomá el siguiente número libre en `docs/trazabilidad.md` y reemplazá `NNN` en el título.
+        Ver la convención completa en `docs/convencion-identificadores.md`.
+  - type: input
+    id: caso
+    attributes:
+      label: Caso de prueba
+      description: Caso que detectó el defecto
+      placeholder: CP-FIN-02-03
+    validations:
+      required: true
+  - type: input
+    id: requisito
+    attributes:
+      label: Requisito
+      placeholder: REQ-FIN-02
+    validations:
+      required: true
+  - type: dropdown
+    id: severidad
+    attributes:
+      label: Severidad
+      description: Criterios en docs/convencion-identificadores.md
+      options:
+        - Crítica
+        - Alta
+        - Media
+        - Baja
+    validations:
+      required: true
+  - type: dropdown
+    id: componente
+    attributes:
+      label: Componente
+      options:
+        - Backend
+        - Frontend
+        - Base de datos (nexacore-test)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versión
+      description: Commit, rama o tag donde se detectó
+      placeholder: develop @ a1b2c3d
+    validations:
+      required: true
+  - type: textarea
+    id: precondiciones
+    attributes:
+      label: Precondiciones y datos
+      description: Rol del usuario, datos sembrados, archivos usados
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Pasos para reproducir
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: Resultado esperado
+    validations:
+      required: true
+  - type: textarea
+    id: obtenido
+    attributes:
+      label: Resultado obtenido
+    validations:
+      required: true
+  - type: textarea
+    id: evidencia
+    attributes:
+      label: Evidencia
+      description: Capturas, logs o enlace a la ejecución del pipeline
+  - type: input
+    id: deteccion
+    attributes:
+      label: Detectado por y fecha
+      placeholder: Pilar · 2026-10-19
+    validations:
+      required: true
