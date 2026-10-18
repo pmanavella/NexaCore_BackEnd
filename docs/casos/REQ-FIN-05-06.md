@@ -1,9 +1,11 @@
 # REQ-FIN-05 y REQ-FIN-06 · Liquidación de sueldos en pesos y en dólares
 
-**Riesgo:** R-01 (alto) · **Versión:** 1.0, 17/10/2026
+**Riesgo:** R-01 (alto) · **Versión:** 1.2, 18/10/2026
 
 **Precondiciones comunes:** usuario Dirección activo; empleados del seed (E-01 a E-09, ver `docs/datos-de-prueba.md`); cotización fija de prueba: compra 1000, venta 1050.
 **Pasos comunes:** registrar un movimiento salarial para el empleado indicado y consultar el monto guardado en pesos.
+
+**Reparto de responsabilidades (aclarado el 18/10):** para empleados mensuales, el frontend propone el monto base (en dólares, convertido con la cotización) y el usuario puede ajustarlo; el backend guarda el monto confirmado. Para empleados por hora o por turno, el frontend envía la cantidad y el backend calcula monto_base × cantidad.
 
 ## Tabla de decisión
 
@@ -23,7 +25,7 @@ Planta o temporal no interviene en el cálculo; se alterna entre empleados para 
 
 | ID | Regla | Empleado | Resultado esperado | Criterio de aceptación | Prior. | Nivel |
 |---|---|---|---|---|---|---|
-| CP-FIN-05-01 | R1 | E-01 (planta, 800.000) | 800.000 | monto = 800000.00 | Alta | U |
+| CP-FIN-05-01 | R1 | E-01 (planta, 800.000), con el monto propuesto 800.000 | 800.000 | monto = 800000.00 | Alta | U |
 | CP-FIN-05-02 | R2 | E-02 (temporal, 5.000/h) | 50.000 | monto = 50000.00 | Alta | U |
 | CP-FIN-05-03 | R3 | E-03 (planta, 40.000/turno) | 120.000 | monto = 120000.00 | Alta | U |
 | CP-FIN-06-01 | R4 | E-04 (temporal, USD 1.000) | 1.000.000 | monto = 1000000.00 | Alta | S |
@@ -55,4 +57,18 @@ Los casos en dólares son de sistema porque la conversión la hace el frontend c
 | CP-FIN-05-09 | Equivalencia (inválida) | Alta de empleado con tipo_salario `semanal` | Se rechaza | HTTP 400 y ningún empleado nuevo | Media | U |
 | CP-FIN-05-10 | Transición | Editar E-02 (por hora) cambiando solo el apellido | Conserva la estructura por hora | tipo_salario sigue en `hora` | Media | I |
 
-**Hallazgos relacionados:** 06-07, 06-08 → H-21 · 05-06, 05-07 → H-20 · 05-09, 05-10 → H-22.
+## Formulario de sueldos (interfaz)
+
+| ID | Técnica | Datos de entrada | Resultado esperado | Criterio de aceptación | Prior. | Nivel |
+|---|---|---|---|---|---|---|
+| CP-FIN-05-11 | Equivalencia (RN-01) | Al registrar el sueldo de E-01, escribir el monto `800.000` | Se guarda 800.000 | monto = 800000.00 | Alta | S |
+| CP-FIN-05-12 | Equivalencia (RN-01) | Escribir el monto `1.234,56` | Se guarda 1234,56 | monto = 1234.56 | Media | S |
+| CP-FIN-06-10 | Sincronización | En E-04 (USD), escribir un monto antes de que cargue la cotización | El monto escrito no se reemplaza sin aviso | El valor escrito se conserva o el sistema avisa del cambio | Media | S |
+
+## Correcciones de diseño
+
+| Fecha | Caso | Cambio | Motivo |
+|---|---|---|---|
+| 18/10/2026 | CP-FIN-05-01 | Los datos de entrada incluyen el monto propuesto por el frontend | La versión 1.0 asumía que el backend calcula el sueldo mensual; el sistema asigna esa tarea al frontend, que propone el monto base y permite ajustarlo. El resultado esperado (800.000) no cambia. El caso no detectaba un defecto, sino un supuesto equivocado del diseño |
+
+**Hallazgos relacionados:** 05-11, 05-12 → H-34 · 06-10 → H-35 · 06-07, 06-08 → H-21, H-36 · 05-06, 05-07 → H-20 · 05-09, 05-10 → H-22.

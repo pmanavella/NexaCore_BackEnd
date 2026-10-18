@@ -24,6 +24,14 @@ Los criterios de aceptación se fijan antes de ejecutar. Estos casos dependen de
 | En la importación, un tipo con espacios (`" Gasto"`) se acepta recortado, igual que al guardar | CP-FIN-04-05 | ☐ |
 | `dias=0` en próximos vencimientos significa "solo hoy" | CP-FIN-08-06 | ☐ |
 
+## Correcciones de diseño
+
+Cuando un caso está mal diseñado (por ejemplo, prueba una regla que el sistema no tiene), se corrige con justificación escrita en el archivo del caso, nunca para que una prueba pase. El resultado esperado solo cambia si cambia el requisito.
+
+| Fecha | Caso | Archivo |
+|---|---|---|
+| 18/10/2026 | CP-FIN-05-01 | `REQ-FIN-05-06.md` |
+
 ## Niveles
 
 **U** unitaria · **I** integración o API contra nexacore-test · **S** sistema, desde la interfaz.

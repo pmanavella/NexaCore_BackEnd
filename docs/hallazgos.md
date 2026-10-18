@@ -1,6 +1,6 @@
 # Hallazgos de auditoría
 
-Surgen de la lectura del código (17/10/2026). **No son defectos**: cada uno se verifica con su caso de prueba y, si el caso falla, se registra como `DEF-NNN` en GitHub Issues. Los marcados como *inferido* no fueron ejecutados ni siquiera en la auditoría.
+Surgen de la lectura del código (17 y 18/10/2026). **No son defectos**: cada uno se verifica con su caso de prueba y, si el caso falla, se registra como `DEF-NNN` en GitHub Issues. Los marcados como *inferido* no fueron ejecutados ni siquiera en la auditoría.
 
 ## Alcance, estructura y entorno
 
@@ -43,6 +43,9 @@ Surgen de la lectura del código (17/10/2026). **No son defectos**: cada uno se 
 | H-20 | Se aceptan montos y cantidades negativos en movimientos salariales | CP-FIN-05-06, 05-07 |
 | H-21 | El backend no verifica la conversión a pesos: usa el `monto_ars` que envía el frontend y, si falta, guarda el monto en dólares como si fueran pesos | CP-FIN-06-07, 06-08 |
 | H-22 | Un tipo de salario o moneda inválidos se reemplazan en silencio; editar sin enviarlos vuelve el empleado a mensual en pesos y borra la cotización | CP-FIN-05-09, 05-10 |
+| H-34 | El campo de monto del formulario de sueldos solo admite dígitos y punto: `800.000` se guarda como 800 | CP-FIN-05-11, 05-12 |
+| H-35 | Al llegar la cotización, el formulario de sueldos reemplaza sin aviso el monto que el usuario ya escribió | CP-FIN-06-10 |
+| H-36 | En sueldos en dólares, si el usuario edita el monto, `monto_origen × cotización` deja de coincidir con `monto_ars`; ni el frontend ni el backend lo controlan | CP-FIN-06-07, 06-08 |
 | H-24 | El backend no consulta ningún servicio de cotización: la consulta externa está en el frontend (`dolarService.js`); el POST guarda la cotización sin validar | Ver nota al final |
 
 ## Suscripciones
