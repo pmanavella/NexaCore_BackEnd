@@ -54,10 +54,13 @@ const MODULO_FINANCE = { id: 'mod-fin', nombre: 'finance', label: 'Finanzas' };
 // (modulos, usuario_modulo_permisos, rol_modulo_permisos) del módulo 'finance'.
 // permiso: 'editor' | 'lector' | null (sin permiso manual).
 // Al mando alto se le da además puede_ver/puede_editar por rol, como en la
-// configuración real; al resto, ningún permiso por rol.
-function simularSesion(t, { rol, permiso = null, activo = true }) {
+// configuración real; al resto, ningún permiso por rol salvo que se pida con
+// permisoPorRol: true.
+function simularSesion(t, { rol, permiso = null, activo = true, permisoPorRol = false }) {
   const usuario = { id: 'u1', nombre: 'Usuario Prueba', rol_id: `rol-${rol}`, roles: { id: `rol-${rol}`, nombre: rol } };
-  const permisoRol = MANDO_ALTO.includes(rol) ? { modulo_id: MODULO_FINANCE.id, puede_ver: true, puede_editar: true } : null;
+  const permisoRol = MANDO_ALTO.includes(rol) || permisoPorRol
+    ? { modulo_id: MODULO_FINANCE.id, puede_ver: true, puede_editar: true }
+    : null;
   const permisoManual = permiso
     ? { id: 'p1', usuario_id: 'u1', modulo_id: MODULO_FINANCE.id, permiso, alcance: 'global', modulos: MODULO_FINANCE }
     : null;
@@ -202,9 +205,23 @@ const TODAS = [...FINANZAS, ...SUELDOS, ...TRAZABILIDAD, ...MIGRACION_ALTO];
 // ── Tabla de casos: rol × ruta × método → código esperado ──────────────────
 
 const casos = [];
-const agregar = (id, rutas, sesion, esperado) => {
-  for (const ruta of rutas) casos.push({ id, ruta, sesion, esperado });
+const agregar = (id, rutas, sesion, esperado, extra = {}) => {
+  for (const ruta of rutas) casos.push({ id, ruta, sesion, esperado, ...extra });
 };
+
+// Métodos de los services de Finanzas que escriben datos. Con sinEscritura: true,
+// el caso verifica además que no se llamó a ninguno (la tabla no cambia).
+const ESCRITURA = [
+  [movimientosService, ['crear', 'actualizar', 'eliminar']],
+  [comprobantesService, ['subirArchivo', 'persistir', 'persistirItems', 'eliminar', 'limpiarVencidos']],
+  [suscripcionesService, ['crear', 'actualizar', 'eliminar']],
+  [excelService, ['importar']],
+  [migracionService, ['confirmar', '_insertarRegistros', 'revertirBatch']],
+  [salariosService, ['guardarCotizacion', 'crearEmpleado', 'actualizarEmpleado', 'eliminarEmpleado',
+    'crearCategoria', 'eliminarCategoria', 'crearMovimiento', 'actualizarMovimiento', 'eliminarMovimiento']],
+];
+const escriturasLlamadas = () => ESCRITURA.flatMap(([svc, metodos]) =>
+  metodos.filter(m => svc[m].mock.callCount() > 0).map(m => `${svc.constructor.name}.${m}`));
 
 agregar('CP-FIN-16-01', TODAS, null, '401');
 agregar('CP-FIN-16-02', TODAS, { rol: 'Superadmin', activo: false }, '403');
@@ -221,12 +238,16 @@ for (const rol of MANDO_ALTO) agregar('CP-FIN-17-04', TRAZABILIDAD, { rol }, '20
 for (const rol of OTROS_ROLES) agregar('CP-FIN-17-04', TRAZABILIDAD, { rol, permiso: 'editor' }, '403');
 for (const rol of MANDO_ALTO) agregar('CP-FIN-17-05', MIGRACION_ALTO, { rol }, '2xx');
 for (const rol of OTROS_ROLES) agregar('CP-FIN-17-05', MIGRACION_ALTO, { rol, permiso: 'editor' }, '403');
+// El permiso de finance cargado por rol no habilita Finanzas a quien no es mando alto.
+agregar('CP-FIN-16-12', FINANZAS_CONSULTA, { rol: 'Contable', permisoPorRol: true }, '403');
+agregar('CP-FIN-16-12', FINANZAS_CARGA, { rol: 'Contable', permisoPorRol: true }, '403', { sinEscritura: true });
 
 function describirSesion(sesion) {
   if (!sesion) return 'sin sesión';
   const partes = [sesion.rol];
   if (sesion.activo === false) partes.push('inactivo');
   partes.push(sesion.permiso ? `permiso ${sesion.permiso}` : 'sin permiso manual');
+  if (sesion.permisoPorRol) partes.push('permiso finance por rol');
   return partes.join(', ');
 }
 
@@ -244,6 +265,7 @@ for (const c of casos) {
     const r = await llamar(app, c.ruta, { conSesion: !!c.sesion });
 
     // Assert
+    if (c.sinEscritura) assert.deepEqual(escriturasLlamadas(), [], 'no debe llamarse a ningún service que escriba');
     assert.equal(clase(r.status, c.esperado), c.esperado);
   });
 }
