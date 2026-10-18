@@ -95,6 +95,38 @@ function calcularMontosUsdEdicion(guardado, body) {
   return convertirUsdAPesos(usd, cotizacion, body)
 }
 
+const MODALIDAD_POR_TIPO_SALARIO = { mensual: 'Mensual', hora: 'Por Horas', turno: 'Por Turno' }
+const MONEDAS_EMPLEADO = ['ARS', 'USD']
+const CAMPOS_COTIZACION = ['cotizacion_tipo', 'cotizacion_valor', 'cotizacion_fecha', 'cotizacion_fuente']
+
+// tipo_salario y moneda, si se envían, deben ser valores válidos (no se reemplazan por un defecto).
+function validarTipoSalarioYMoneda({ tipo_salario, moneda }) {
+  if (presente(tipo_salario) && !MODALIDAD_POR_TIPO_SALARIO[tipo_salario]) {
+    throw Object.assign(
+      new Error(`Tipo de salario inválido: "${tipo_salario}". Valores permitidos: ${Object.keys(MODALIDAD_POR_TIPO_SALARIO).join(', ')}.`),
+      { status: 400 }
+    )
+  }
+  if (presente(moneda) && !MONEDAS_EMPLEADO.includes(moneda)) {
+    throw Object.assign(
+      new Error(`Moneda inválida: "${moneda}". Valores permitidos: ${MONEDAS_EMPLEADO.join(', ')}.`),
+      { status: 400 }
+    )
+  }
+}
+
+// Los empleados en USD necesitan los cuatro datos de cotización; en ARS quedan en null.
+function resolverCotizacion(moneda, cotizacion) {
+  if (moneda !== 'USD') return Object.fromEntries(CAMPOS_COTIZACION.map(c => [c, null]))
+  if (CAMPOS_COTIZACION.some(c => !cotizacion[c])) {
+    throw Object.assign(
+      new Error('Para empleados en USD debe seleccionar una cotización válida (compra o venta).'),
+      { status: 400 }
+    )
+  }
+  return { ...cotizacion, cotizacion_valor: Number(cotizacion.cotizacion_valor) }
+}
+
 class SalariosService {
   // ── Empleados ────────────────────────────────────────────────
 
@@ -132,17 +164,11 @@ class SalariosService {
     if (!nombre || !apellido || !tipo_permanencia)
       throw Object.assign(new Error('Faltan campos obligatorios: nombre, apellido, tipo_permanencia'), { status: 400 })
 
-    const tipoSalarioValido = ['mensual', 'hora', 'turno']
-    const tipoSalarioFinal = tipoSalarioValido.includes(tipo_salario) ? tipo_salario : 'mensual'
-    const modalidadDerived = { mensual: 'Mensual', hora: 'Por Horas', turno: 'Por Turno' }[tipoSalarioFinal]
-    const monedaFinal = ['ARS', 'USD'].includes(moneda) ? moneda : 'ARS'
-
-    if (monedaFinal === 'USD' && (!cotizacion_tipo || !cotizacion_valor || !cotizacion_fecha || !cotizacion_fuente)) {
-      throw Object.assign(
-        new Error('Para empleados en USD debe seleccionar una cotización válida (compra o venta).'),
-        { status: 400 }
-      )
-    }
+    validarTipoSalarioYMoneda(body)
+    // Si no se envían, se usan los valores por defecto (mensual, ARS)
+    const tipoSalarioFinal = presente(tipo_salario) ? tipo_salario : 'mensual'
+    const monedaFinal = presente(moneda) ? moneda : 'ARS'
+    const cotizacion = resolverCotizacion(monedaFinal, { cotizacion_tipo, cotizacion_valor, cotizacion_fecha, cotizacion_fuente })
 
     const { data, error } = await supabase
       .from('empleados')
@@ -151,16 +177,13 @@ class SalariosService {
         email: normalizarContacto(email),
         telefono: normalizarContacto(telefono),
         tipo_permanencia,
-        modalidad_trabajo: modalidadDerived,
+        modalidad_trabajo: MODALIDAD_POR_TIPO_SALARIO[tipoSalarioFinal],
         fecha_ingreso,
         estado: estado || 'Activo',
         tipo_salario: tipoSalarioFinal,
         monto_base: monto_base ? Number(monto_base) : 0,
         moneda: monedaFinal,
-        cotizacion_tipo:   monedaFinal === 'USD' ? cotizacion_tipo                : null,
-        cotizacion_valor:  monedaFinal === 'USD' ? Number(cotizacion_valor)       : null,
-        cotizacion_fecha:  monedaFinal === 'USD' ? cotizacion_fecha               : null,
-        cotizacion_fuente: monedaFinal === 'USD' ? cotizacion_fuente              : null,
+        ...cotizacion,
       }])
       .select()
       .single()
@@ -172,31 +195,23 @@ class SalariosService {
     const {
       nombre, apellido, email, telefono, tipo_permanencia, fecha_ingreso, estado,
       tipo_salario, monto_base, moneda,
-      cotizacion_tipo, cotizacion_valor, cotizacion_fecha, cotizacion_fuente,
     } = body
-    const tipoSalarioValido = ['mensual', 'hora', 'turno']
-    const tipoSalarioFinal = tipoSalarioValido.includes(tipo_salario) ? tipo_salario : 'mensual'
-    const monedaFinal = ['ARS', 'USD'].includes(moneda) ? moneda : 'ARS'
+    validarTipoSalarioYMoneda(body)
 
-    if (monedaFinal === 'USD' && (!cotizacion_tipo || !cotizacion_valor || !cotizacion_fecha || !cotizacion_fuente)) {
-      throw Object.assign(
-        new Error('Para empleados en USD debe seleccionar una cotización válida (compra o venta).'),
-        { status: 400 }
-      )
+    // Un campo que no se envía conserva su valor guardado
+    const updates = { nombre, apellido, tipo_permanencia, fecha_ingreso, estado }
+    if (email !== undefined) updates.email = normalizarContacto(email)
+    if (telefono !== undefined) updates.telefono = normalizarContacto(telefono)
+    if (presente(tipo_salario)) {
+      updates.tipo_salario = tipo_salario
+      updates.modalidad_trabajo = MODALIDAD_POR_TIPO_SALARIO[tipo_salario]
     }
-
-    const updates = {
-      nombre, apellido,
-      email: normalizarContacto(email),
-      telefono: normalizarContacto(telefono),
-      tipo_permanencia, fecha_ingreso, estado,
-      modalidad_trabajo: { mensual: 'Mensual', hora: 'Por Horas', turno: 'Por Turno' }[tipoSalarioFinal],
-      tipo_salario: tipoSalarioFinal,
-      moneda: monedaFinal,
-      cotizacion_tipo:   monedaFinal === 'USD' ? cotizacion_tipo                : null,
-      cotizacion_valor:  monedaFinal === 'USD' ? Number(cotizacion_valor)       : null,
-      cotizacion_fecha:  monedaFinal === 'USD' ? cotizacion_fecha               : null,
-      cotizacion_fuente: monedaFinal === 'USD' ? cotizacion_fuente              : null,
+    if (presente(moneda) || CAMPOS_COTIZACION.some(c => body[c] !== undefined)) {
+      // Moneda y cotización se resuelven juntas, completando con lo guardado lo que no se envía
+      const guardado = await this.obtenerEmpleadoPorId(id)
+      const monedaFinal = presente(moneda) ? moneda : guardado.moneda
+      const cotizacion = Object.fromEntries(CAMPOS_COTIZACION.map(c => [c, body[c] !== undefined ? body[c] : guardado[c]]))
+      Object.assign(updates, { moneda: monedaFinal, ...resolverCotizacion(monedaFinal, cotizacion) })
     }
     if (monto_base !== undefined) updates.monto_base = Number(monto_base) || 0
 
