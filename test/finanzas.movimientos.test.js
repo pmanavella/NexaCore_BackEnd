@@ -36,8 +36,9 @@ function fakeFrom(handler) {
 const op = (st, nombre) => st.ops.find(o => o[0] === nombre);
 
 // Sesión de un usuario Dirección (mando alto) para aislar la validación de los
-// permisos. La tabla `movimientos` acepta cualquier inserción y la registra.
-function simularBase(t) {
+// permisos. La tabla `movimientos` acepta cualquier inserción y la registra;
+// las ediciones se aplican sobre `existentes` (id → fila).
+function simularBase(t, existentes = {}) {
   const insertados = [];
   t.mock.method(supabase.auth, 'getUser', async () => ({ data: { user: { email: 'direccion@test' } }, error: null }));
   t.mock.method(supabase, 'from', fakeFrom((st) => {
@@ -46,6 +47,11 @@ function simularBase(t) {
       const [fila] = op(st, 'insert')[1];
       insertados.push(fila);
       return { data: { id: `m${insertados.length}`, ...fila }, error: null };
+    }
+    if (st.table === 'movimientos' && op(st, 'update')) {
+      const [, , id] = st.ops.find(o => o[0] === 'eq' && o[1] === 'id');
+      existentes[id] = { ...existentes[id], ...op(st, 'update')[1] };
+      return { data: existentes[id], error: null };
     }
     throw new Error(`tabla inesperada ${st.table}`);
   }));
@@ -61,11 +67,19 @@ function appMovimientos() {
 }
 
 async function crearMovimiento(app, body) {
+  return pedir(app, 'POST', '/api/finance/movimientos', body);
+}
+
+async function editarMovimiento(app, id, body) {
+  return pedir(app, 'PUT', `/api/finance/movimientos/${id}`, body);
+}
+
+async function pedir(app, method, ruta, body) {
   const server = http.createServer(app).listen(0);
   try {
     const { port } = server.address();
-    const res = await fetch(`http://127.0.0.1:${port}/api/finance/movimientos`, {
-      method: 'POST',
+    const res = await fetch(`http://127.0.0.1:${port}${ruta}`, {
+      method,
       headers: { authorization: 'Bearer token-de-prueba', 'content-type': 'application/json' },
       body: JSON.stringify(body),
     });
@@ -106,6 +120,9 @@ casos.push(
   { id: 'CP-FIN-02-11', cambio: { monto: 0.001 },                rechazo: true },
   { id: 'CP-FIN-02-12', cambio: { monto: 9999999999999.99 },     guardado: { monto: 9999999999999.99 } },
   { id: 'CP-FIN-02-13', cambio: { monto: 10000000000000 },       rechazo: true },
+  // Residuo de punto flotante (0.1 + 0.2): representa 0.30 y se guarda redondeado.
+  { id: 'CP-FIN-02-15', cambio: { monto: 0.30000000000000004 },  guardado: { monto: 0.3 } },
+  { id: 'CP-FIN-02-15', cambio: { monto: 1000.1 },               guardado: { monto: 1000.1 } },
 );
 
 const describir = (cambio) => Object.entries(cambio).map(([k, v]) => `${k} ${JSON.stringify(v)}`).join(', ');
@@ -134,3 +151,20 @@ for (const c of casos) {
     }
   });
 }
+
+// ── Edición ─────────────────────────────────────────────────────────────────
+
+test('CP-FIN-02-14 PUT /api/finance/movimientos/:id con fecha "2026-02-31" → 400 y el movimiento no cambia', async (t) => {
+  // Arrange
+  const original = { id: 'm1', ...BASE };
+  const existentes = { m1: { ...original } };
+  simularBase(t, existentes);
+
+  // Act
+  const r = await editarMovimiento(appMovimientos(), 'm1', { ...BASE, fecha: '2026-02-31' });
+
+  // Assert
+  const detalle = `HTTP ${r.status}: ${JSON.stringify(r.body.error ?? r.body)}`;
+  assert.equal(r.status, 400, `se esperaba HTTP 400; se obtuvo ${detalle}`);
+  assert.deepEqual(existentes.m1, original, 'el movimiento no debe cambiar');
+});
