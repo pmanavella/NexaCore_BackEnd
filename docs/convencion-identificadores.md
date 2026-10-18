@@ -1,7 +1,7 @@
 # Convención de identificadores y catálogo de requisitos
 
 **NexaCore · Módulo Financiero · TP Integrador de Calidad de Software**
-Versión 1.1 · 17 de octubre de 2026 · Responsable: Pilar
+Versión 1.2 · 18 de octubre de 2026 · Responsable: Pilar
 
 Este documento define cómo se nombra cada elemento del proceso de calidad para que todo quede trazable: requisito → caso de prueba → test automatizado → defecto → corrección → prueba de regresión.
 
@@ -73,6 +73,7 @@ Construido a partir del análisis funcional y contrastado con la auditoría de l
 | REQ-FIN-15 | Exportar el libro diario a PDF | Frontend | |
 | REQ-FIN-16 | Solo los roles de mando alto (nivel HIGH: Superadmin y Dirección) acceden al módulo Financiero; otro usuario accede solo con permiso manual en la matriz, con nivel lector (consulta) o editor (consulta y carga) | Backend y frontend | H-25, H-26 |
 | REQ-FIN-17 | Sueldos, trazabilidad y confirmación o reversión de migraciones son exclusivos de los roles de mando alto | Backend y frontend | H-18, H-27 |
+| REQ-FIN-18 | Ante la indisponibilidad de Supabase, el módulo informa el problema de forma comprensible, no pierde ni duplica datos y se recupera sin intervención (ver `docs/plan-contingencia.md`) | Backend y frontend | H-37 a H-45 |
 
 ## 6. Reglas de negocio definidas por el equipo
 

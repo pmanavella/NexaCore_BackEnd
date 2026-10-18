@@ -73,6 +73,20 @@ Surgen de la lectura del código (17 y 18/10/2026). **No son defectos**: cada un
 | H-32 | La fecha inicial del formulario se calcula en UTC: después de las 21 h propone el día siguiente | — |
 | H-33 | El OCR sobrescribe fecha, categoría y tipo elegidos por el usuario; editar un sueldo desde Movimientos borra su cuenta contrapartida | — |
 
+## Indisponibilidad de Supabase (relevado el 18/10 para el plan de contingencia)
+
+| ID | Hallazgo | Casos |
+|---|---|---|
+| H-37 | `GET /api/health` siempre responde 200 sin consultar Supabase | CP-FIN-18-01 |
+| H-38 | Las fallas de Supabase llegan al cliente como HTTP 500 con el mensaje técnico o el HTML de la página de error; nunca 503. Con la base caída, un batch se informa como "no encontrado" (404) | CP-FIN-18-02, 18-03 |
+| H-39 | Si cae Supabase Auth, la autenticación responde 401 "Token inválido o expirado", igual que con un token inválido | CP-FIN-18-04 |
+| H-40 | Sin timeouts en el cliente de Supabase, en Express ni en el frontend: las peticiones pueden quedar colgadas varios minutos | CP-FIN-18-05 |
+| H-41 | Operaciones de varios pasos sin transacciones: archivos huérfanos, comprobantes procesados sin movimiento, batches trabados en "procesando" que no se pueden revertir, importaciones parciales; la limpieza nocturna puede dejar filas apuntando a archivos borrados | CP-FIN-18-06 a 18-08 |
+| H-42 | Ante un error, las pantallas de Finanzas muestran "No hay … registradas", sin aviso ni reintento; los mensajes de error son técnicos | CP-FIN-18-09, 18-10 |
+| H-43 | Una caída se informa en el inicio de sesión como "Email o contraseña incorrectos"; pueden quedar sesiones a medias | CP-FIN-18-11 |
+| H-44 | Logs solo en consola, sin ruta, usuario ni hora; los procesos programados no registran su resultado ni reintentan; no hay `HEALTHCHECK` | — |
+| H-45 | Al crear un gasto con una suscripción nueva, si falla el segundo paso la suscripción queda creada y reintentar la duplica | — |
+
 ## Nota sobre la cotización del dólar (H-24)
 
 Las pruebas con dobles de prueba de la API del dólar (tarea de Victoria) no pueden hacerse en el backend, porque ahí no hay llamada externa. Se hacen sobre `src/lib/dolarService.js` del frontend con `node:test`, que viene con Node y no requiere instalar nada, simulando `fetch` con `t.mock.method`. Si el archivo depende de algo propio de Vite, se evalúa el plan de respaldo con Vitest.
