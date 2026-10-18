@@ -1,6 +1,6 @@
 # REQ-FIN-16 y REQ-FIN-17 · Acceso por jerarquía y permiso manual
 
-**Riesgo:** R-02 (alto) · **Versión:** 1.1, 17/10/2026 · **Oráculo:** regla RN-02
+**Riesgo:** R-02 (alto) · **Versión:** 1.2, 18/10/2026 · **Oráculo:** regla RN-02
 
 **Regla.** Superadmin y Dirección (mando alto, nivel HIGH) acceden a todo el módulo. Otro usuario solo accede con permiso manual en la matriz del módulo `finance`: con nivel lector consulta; con nivel editor también carga, edita y borra. Sueldos, trazabilidad y confirmar o revertir migraciones son exclusivos de mando alto.
 
@@ -38,6 +38,7 @@ Se automatiza como un test parametrizado que recorre todas las celdas.
 | CP-FIN-17-02 | Superadmin y Dirección, sueldos | HTTP 200 | Alta | U/I |
 | CP-FIN-17-04 | Trazabilidad para cada usuario | Solo mando alto recibe 200 | Media | U/I |
 | CP-FIN-17-05 | Migración confirmar y revertir para cada usuario | Solo mando alto recibe 200; Dirección incluida | Alta | U/I |
+| CP-FIN-16-12 | Contable con permiso de Finanzas **por rol** en la matriz y sin permiso por usuario, en todas las rutas de Finanzas (consulta y carga) | HTTP 403 y la tabla no cambia | Alta | U/I |
 
 ## Interfaz
 
@@ -48,4 +49,4 @@ Se automatiza como un test parametrizado que recorre todas las celdas.
 | CP-FIN-16-11 | Usuario con permiso lector dentro de Finanzas | No se ofrecen acciones de carga, edición ni borrado | Botones ausentes | Media | S |
 | CP-FIN-17-03 | Usuario con permiso editor dentro de Finanzas | No ve la pestaña Sueldos | Pestaña ausente | Media | S |
 
-**Hallazgos relacionados:** 16-04 a 16-08 → H-25 · 16-09 a 16-11 → H-26 · 17-03 → H-27 · 17-05 → H-18.
+**Hallazgos relacionados:** 16-04 a 16-08, 16-12 → H-25 · 16-09 a 16-11 → H-26 · 17-03 → H-27 · 17-05 → H-18.

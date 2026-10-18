@@ -21,7 +21,7 @@ Se actualiza cada vez que se diseña un caso, se automatiza un test o se registr
 | REQ-FIN-13 | | | | Sin casos |
 | REQ-FIN-14 | CP-FIN-14-01 a 14-07 | | | Diseñado |
 | REQ-FIN-15 | CP-FIN-15-01, 15-02 | | | Diseñado |
-| REQ-FIN-16 | CP-FIN-16-01 a 16-11 | `test/finanzas.permisos.test.js` (16-01 a 16-08) | DEF-001 (#18), DEF-002 (#19), DEF-003 (#20) | Con defectos abiertos |
+| REQ-FIN-16 | CP-FIN-16-01 a 16-12 | `test/finanzas.permisos.test.js` (16-01 a 16-08) | DEF-001 (#18), DEF-002 (#19), DEF-003 (#20) | Con defectos abiertos |
 | REQ-FIN-17 | CP-FIN-17-01 a 17-05 | `test/finanzas.permisos.test.js` (17-01, 17-02, 17-04, 17-05) | DEF-004 (#21) | Con defectos abiertos |
 | REQ-FIN-18 | CP-FIN-18-01 a 18-12 (en `plan-contingencia.md`) | | | Diseñado |
 

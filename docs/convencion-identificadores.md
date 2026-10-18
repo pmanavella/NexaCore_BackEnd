@@ -100,4 +100,6 @@ El resultado se redondea a 2 decimales. Si queda en 0 o menos, la fila se rechaz
 | Otro rol con permiso manual nivel lector | Sí | No | No |
 | Otro rol sin permiso manual | No | No | No |
 
-"Finanzas" incluye movimientos, comprobantes, suscripciones, importaciones y cotización del dólar. El permiso manual es el que se asigna en la matriz de permisos del módulo `finance`.
+"Finanzas" incluye movimientos, comprobantes, suscripciones, importaciones y cotización del dólar.
+
+**Permiso manual** es el permiso asignado **a un usuario en particular** en la matriz del módulo `finance`. Los permisos cargados **por rol** en la matriz no habilitan Finanzas a quien no es mando alto: así, ningún rol completo (por ejemplo, todos los Contables) accede sin que se le dé permiso a cada persona. Aclaración del 18/10/2026; la regla queda garantizada por el código, no por la configuración de la matriz.

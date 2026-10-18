@@ -87,6 +87,12 @@ Surgen de la lectura del código (17 y 18/10/2026). **No son defectos**: cada un
 | H-44 | Logs solo en consola, sin ruta, usuario ni hora; los procesos programados no registran su resultado ni reintentan; no hay `HEALTHCHECK` | — |
 | H-45 | Al crear un gasto con una suscripción nueva, si falla el segundo paso la suscripción queda creada y reintentar la duplica | — |
 
+## Tests del equipo
+
+| ID | Hallazgo | Casos |
+|---|---|---|
+| H-46 | 4 de los 8 tests de `documentExtraction.test.js` fallaban en `develop` desde el commit `1f04ba4` (14/09), sin que nadie lo notara durante un mes porque los tests no se ejecutaban en ningún pipeline. No era un defecto del código: los tests quedaron desactualizados por dos cambios de regla intencionales (renglones netos contra subtotal; categoría inválida como advertencia). Se actualizaron en el pull request #29, a revisar por Victoria | — |
+
 ## Nota sobre la cotización del dólar (H-24)
 
 Las pruebas con dobles de prueba de la API del dólar (tarea de Victoria) no pueden hacerse en el backend, porque ahí no hay llamada externa. Se hacen sobre `src/lib/dolarService.js` del frontend con `node:test`, que viene con Node y no requiere instalar nada, simulando `fetch` con `t.mock.method`. Si el archivo depende de algo propio de Vite, se evalúa el plan de respaldo con Vitest.
