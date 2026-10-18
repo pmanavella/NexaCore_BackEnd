@@ -25,6 +25,17 @@ function mapearErrorDuplicado(error) {
 
 const presente = (valor) => valor !== undefined && valor !== null && valor !== ''
 
+// Movimientos en pesos: la cantidad, si se envía, y el monto final deben ser mayores a 0.
+function validarCantidadPesos(cantidad) {
+  if (presente(cantidad) && !(Number(cantidad) > 0))
+    throw Object.assign(new Error('La cantidad debe ser mayor a 0'), { status: 400 })
+}
+
+function validarMontoPesos(monto) {
+  if (!(monto > 0))
+    throw Object.assign(new Error('El monto debe ser mayor a 0'), { status: 400 })
+}
+
 // Alta: moneda_origen 'USD' solo es válida para empleados que cobran en dólares.
 function validarMonedaOrigen(empleado, moneda_origen) {
   if (moneda_origen === 'USD' && empleado.moneda !== 'USD') {
@@ -360,11 +371,15 @@ class SalariosService {
 
     if (usd) {
       montoFinal = usd.ars
-    } else if (cantidad !== undefined) {
-      // Movimiento ARS con cantidad (hora/turno): el backend recalcula
-      const base = Number(empleado.monto_base) || 0
-      const cant = Number(cantidad)
-      montoFinal = empleado.tipo_salario === 'mensual' ? base : base * cant
+    } else {
+      if (cantidad !== undefined) {
+        // Movimiento ARS con cantidad (hora/turno): el backend recalcula
+        validarCantidadPesos(cantidad)
+        const base = Number(empleado.monto_base) || 0
+        const cant = Number(cantidad)
+        montoFinal = empleado.tipo_salario === 'mensual' ? base : base * cant
+      }
+      validarMontoPesos(montoFinal)
     }
 
     if (!montoFinal || montoFinal === 0)
@@ -405,11 +420,15 @@ class SalariosService {
 
     if (usd) {
       montoFinal = usd.ars
-    } else if (cantidad !== undefined) {
-      const empleado = await this.obtenerEmpleadoPorId(empleado_id)
-      const base = Number(empleado.monto_base) || 0
-      const cant = Number(cantidad)
-      montoFinal = empleado.tipo_salario === 'mensual' ? base : base * cant
+    } else {
+      if (cantidad !== undefined) {
+        validarCantidadPesos(cantidad)
+        const empleado = await this.obtenerEmpleadoPorId(empleado_id)
+        const base = Number(empleado.monto_base) || 0
+        const cant = Number(cantidad)
+        montoFinal = empleado.tipo_salario === 'mensual' ? base : base * cant
+      }
+      validarMontoPesos(montoFinal)
     }
 
     if (!montoFinal || montoFinal === 0)
