@@ -21,7 +21,7 @@ const SIN_USD = { cotizacion_valor: null, cotizacion_tipo: null, cotizacion_fech
 // Empleados del seed (docs/datos-de-prueba.md) usados por estos casos.
 const EMPLEADOS = {
   'E-01': { nombre: 'Empleado', apellido: 'Uno',   tipo_permanencia: 'Planta',   tipo_salario: 'mensual', moneda: 'ARS', monto_base: 800000, ...SIN_USD },
-  'E-02': { nombre: 'Empleado', apellido: 'Dos',   tipo_permanencia: 'Temporal', tipo_salario: 'hora',    moneda: 'ARS', monto_base: 5000,   ...SIN_USD },
+  'E-02': { nombre: 'Empleado', apellido: 'Dos',   tipo_permanencia: 'Temporal', tipo_salario: 'hora',    moneda: 'ARS', monto_base: 5000,   ...SIN_USD, email: 'e02@nexacore.test', telefono: '3510000002' },
   'E-03': { nombre: 'Empleado', apellido: 'Tres',  tipo_permanencia: 'Planta',   tipo_salario: 'turno',   moneda: 'ARS', monto_base: 40000,  ...SIN_USD },
   'E-04': { nombre: 'Empleado', apellido: 'Cuatro', tipo_permanencia: 'Temporal', tipo_salario: 'mensual', moneda: 'USD', monto_base: 1000,   ...USD },
   'E-05': { nombre: 'Empleado', apellido: 'Cinco', tipo_permanencia: 'Planta',   tipo_salario: 'hora',    moneda: 'USD', monto_base: 10,     ...USD },
@@ -331,6 +331,7 @@ test(`CP-FIN-06-17 PUT /salarios/movimientos/${MOVIMIENTO_USD_E01.id} (guardado 
 const casosAlta = [
   { id: 'CP-FIN-05-09', datos: { tipo_salario: 'semanal' } },
   { id: 'CP-FIN-06-09', datos: { moneda: 'USD', monto_base: 1000, cotizacion_valor: 1000, cotizacion_fecha: '2026-10-15', cotizacion_fuente: 'TEST' } },
+  { id: 'CP-FIN-05-15', datos: { moneda: 'EUR' } },
 ];
 
 for (const c of casosAlta) {
@@ -352,10 +353,15 @@ for (const c of casosAlta) {
 
 const casosEdicion = [
   { id: 'CP-FIN-05-10', empleado: 'E-02', datos: { apellido: 'Apellido Nuevo' }, conserva: { tipo_salario: 'hora' } },
+  { id: 'CP-FIN-05-14', empleado: 'E-04', datos: { apellido: 'Apellido Nuevo' }, conserva: { moneda: 'USD', ...USD } },
+  { id: 'CP-FIN-05-16', empleado: 'E-02', datos: { apellido: 'Apellido Nuevo' }, conserva: { email: EMPLEADOS['E-02'].email, telefono: EMPLEADOS['E-02'].telefono } },
+  // guarda: valor que debe quedar cuando difiere del enviado (un email vacío se borra a propósito).
+  { id: 'CP-FIN-05-16', empleado: 'E-02', datos: { email: '' }, guarda: { email: null }, conserva: { telefono: EMPLEADOS['E-02'].telefono } },
 ];
 
 for (const c of casosEdicion) {
-  test(`${c.id} PUT /salarios/empleados/${c.empleado} con solo ${describir(c.datos)} → conserva ${describir(c.conserva)}`, async (t) => {
+  const guarda = c.guarda ? ` y guarda ${describir(c.guarda)}` : '';
+  test(`${c.id} PUT /salarios/empleados/${c.empleado} con solo ${describir(c.datos)} → conserva ${describir(c.conserva)}${guarda}`, async (t) => {
     // Arrange
     const base = simularBase(t);
 
@@ -365,7 +371,7 @@ for (const c of casosEdicion) {
     // Assert
     assert.equal(r.status, 200, `se esperaba HTTP 200; se obtuvo ${detalle(r)}`);
     const guardado = base.empleados[c.empleado];
-    for (const [campo, valor] of Object.entries(c.datos)) assert.equal(guardado[campo], valor);
+    for (const [campo, valor] of Object.entries({ ...c.datos, ...c.guarda })) assert.equal(guardado[campo], valor);
     for (const [campo, valor] of Object.entries(c.conserva)) {
       assert.equal(guardado[campo], valor, `${campo} debe seguir en ${JSON.stringify(valor)}; quedó ${JSON.stringify(guardado[campo])}`);
     }
