@@ -38,6 +38,11 @@ const MOVIMIENTO_USD_E01 = {
   id: 'MS-USD-E01', empleado_id: 'E-01', ...MOVIMIENTO_BASE, monto: 1000000,
   moneda_origen: 'USD', monto_origen: 1000, cotizacion_usada: 1000, monto_ars: 1000000,
 };
+// Movimiento en pesos de E-01 (mensual, ARS).
+const MOVIMIENTO_ARS_E01 = {
+  id: 'MS-ARS-E01', empleado_id: 'E-01', ...MOVIMIENTO_BASE, monto: 800000,
+  moneda_origen: 'ARS', monto_origen: null, cotizacion_usada: null, monto_ars: null,
+};
 // Movimientos viejos en pesos de E-04, de cuando cobraba en pesos (moneda_origen 'ARS' o nula).
 const MOVIMIENTOS_ARS_E04 = [
   { id: 'MS-ARS', empleado_id: 'E-04', ...MOVIMIENTO_BASE, monto: 500000, moneda_origen: 'ARS', monto_origen: null, cotizacion_usada: null, monto_ars: null },
@@ -72,12 +77,15 @@ const sinIndefinidos = (obj) => Object.fromEntries(Object.entries(obj).filter(([
 // permisos. Simula `empleados` (con E-01 a E-05), `movimientos_salario`,
 // `categorias_salariales` y `cotizaciones_dolar`; acepta cualquier inserción o
 // actualización y la registra en `base`. En `movimientos_salario` existe
-// MOVIMIENTO_USD_E04, MOVIMIENTO_USD_E01 y MOVIMIENTOS_ARS_E04 para los casos de edición.
+// MOVIMIENTO_USD_E04, MOVIMIENTO_USD_E01, MOVIMIENTO_ARS_E01 y MOVIMIENTOS_ARS_E04
+// para los casos de edición.
 function simularBase(t) {
   const base = {
     empleados: Object.fromEntries(Object.entries(EMPLEADOS).map(([id, e]) => [id, { id, estado: 'Activo', ...e }])),
     empleadosInsertados: [],
-    movimientos: Object.fromEntries([MOVIMIENTO_USD_E04, MOVIMIENTO_USD_E01, ...MOVIMIENTOS_ARS_E04].map(m => [m.id, { ...m }])),
+    movimientos: Object.fromEntries(
+      [MOVIMIENTO_USD_E04, MOVIMIENTO_USD_E01, MOVIMIENTO_ARS_E01, ...MOVIMIENTOS_ARS_E04].map(m => [m.id, { ...m }]),
+    ),
     movimientosInsertados: [],
     movimientosActualizados: [],
   };
@@ -229,8 +237,10 @@ for (const c of casosMovimientos) {
 
 // ── Edición de movimientos salariales: PUT /salarios/movimientos/:id ────────
 
+// mensaje: lo que debe indicar el error de la respuesta 400.
 const casosEdicionMovimientos = [
-  { id: 'CP-FIN-06-14', movimiento: MOVIMIENTO_USD_E04.id, datos: { moneda_origen: 'USD', monto_origen: 1000, cotizacion_usada: 1000, monto_ars: 1 } },
+  { id: 'CP-FIN-06-14', movimiento: MOVIMIENTO_USD_E04.id, datos: { moneda_origen: 'USD', monto_origen: 1000, cotizacion_usada: 1000, monto_ars: 1 }, mensaje: MENSAJE_AJUSTE_USD },
+  { id: 'CP-FIN-05-13', movimiento: MOVIMIENTO_ARS_E01.id, datos: { monto: -1000 }, mensaje: /monto debe ser mayor a 0/i },
 ];
 
 for (const c of casosEdicionMovimientos) {
@@ -246,7 +256,7 @@ for (const c of casosEdicionMovimientos) {
 
     // Assert
     assert.equal(r.status, 400, `se esperaba HTTP 400; se obtuvo ${detalle(r)}`);
-    assert.match(String(r.body.error), MENSAJE_AJUSTE_USD);
+    assert.match(String(r.body.error), c.mensaje);
     assert.equal(base.movimientosActualizados.length, 0, 'no debe actualizarse el movimiento');
     assert.deepEqual(base.movimientos[c.movimiento], original);
   });
