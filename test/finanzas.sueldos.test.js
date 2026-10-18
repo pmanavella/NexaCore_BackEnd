@@ -28,6 +28,21 @@ const EMPLEADOS = {
 };
 
 const MOVIMIENTO_BASE = { categoria_id: 'cat-sueldo', fecha: '2026-10-15', descripcion: 'TEST sueldo' };
+// Movimiento ya registrado en dólares para E-04 (USD 1.000 a 1000 = $1.000.000).
+const MOVIMIENTO_USD_E04 = {
+  id: 'MS-USD', empleado_id: 'E-04', ...MOVIMIENTO_BASE, monto: 1000000,
+  moneda_origen: 'USD', monto_origen: 1000, cotizacion_usada: 1000, monto_ars: 1000000,
+};
+// Movimiento viejo en dólares de E-01, que hoy cobra en pesos.
+const MOVIMIENTO_USD_E01 = {
+  id: 'MS-USD-E01', empleado_id: 'E-01', ...MOVIMIENTO_BASE, monto: 1000000,
+  moneda_origen: 'USD', monto_origen: 1000, cotizacion_usada: 1000, monto_ars: 1000000,
+};
+// Movimientos viejos en pesos de E-04, de cuando cobraba en pesos (moneda_origen 'ARS' o nula).
+const MOVIMIENTOS_ARS_E04 = [
+  { id: 'MS-ARS', empleado_id: 'E-04', ...MOVIMIENTO_BASE, monto: 500000, moneda_origen: 'ARS', monto_origen: null, cotizacion_usada: null, monto_ars: null },
+  { id: 'MS-NULA', empleado_id: 'E-04', ...MOVIMIENTO_BASE, monto: 500000, moneda_origen: null, monto_origen: null, cotizacion_usada: null, monto_ars: null },
+];
 const EMPLEADO_NUEVO = {
   nombre: 'TEST', apellido: 'Alta', tipo_permanencia: 'Planta', fecha_ingreso: '2026-10-01',
   tipo_salario: 'mensual', monto_base: 500000, moneda: 'ARS',
@@ -56,12 +71,15 @@ const sinIndefinidos = (obj) => Object.fromEntries(Object.entries(obj).filter(([
 // Sesión de un usuario Dirección (mando alto) para aislar la validación de los
 // permisos. Simula `empleados` (con E-01 a E-05), `movimientos_salario`,
 // `categorias_salariales` y `cotizaciones_dolar`; acepta cualquier inserción o
-// actualización y la registra en `base`.
+// actualización y la registra en `base`. En `movimientos_salario` existe
+// MOVIMIENTO_USD_E04, MOVIMIENTO_USD_E01 y MOVIMIENTOS_ARS_E04 para los casos de edición.
 function simularBase(t) {
   const base = {
     empleados: Object.fromEntries(Object.entries(EMPLEADOS).map(([id, e]) => [id, { id, estado: 'Activo', ...e }])),
     empleadosInsertados: [],
+    movimientos: Object.fromEntries([MOVIMIENTO_USD_E04, MOVIMIENTO_USD_E01, ...MOVIMIENTOS_ARS_E04].map(m => [m.id, { ...m }])),
     movimientosInsertados: [],
+    movimientosActualizados: [],
   };
   const MODULO_FINANCE = { id: 'mod-fin', nombre: 'finance', label: 'Finanzas' };
 
@@ -108,6 +126,17 @@ function simularBase(t) {
           base.movimientosInsertados.push(fila);
           return { data: { id: `ms${base.movimientosInsertados.length}`, ...fila }, error: null };
         }
+        const id = filtro(st, 'id');
+        if (op(st, 'update')) {
+          const cambios = sinIndefinidos(op(st, 'update')[1]);
+          base.movimientosActualizados.push({ id, ...cambios });
+          base.movimientos[id] = { ...base.movimientos[id], ...cambios };
+          return { data: base.movimientos[id], error: null };
+        }
+        if (id) {
+          const m = base.movimientos[id];
+          return m ? { data: m, error: null } : { data: null, error: { message: 'no rows' } };
+        }
         return { data: [], error: null };
       }
       default:
@@ -147,6 +176,8 @@ const describir = (obj) => Object.entries(obj).map(([k, v]) => `${k} ${JSON.stri
 // montos: lista de resultados aceptados. Un número es el monto que debe
 // guardarse en pesos (HTTP 201); RECHAZO es HTTP 400 sin inserción.
 const RECHAZO = '400 sin inserción';
+// RN-03 (4): el rechazo por diferencia en pesos indica ajustar el monto en dólares.
+const MENSAJE_AJUSTE_USD = /ajust.*d[oó]lares/i;
 
 const casosMovimientos = [
   // Mensual: el frontend propone monto_base y envía el monto confirmado.
@@ -161,6 +192,14 @@ const casosMovimientos = [
   // Dólares: se acepta rechazar o convertir a pesos; nunca guardar dólares como pesos.
   { id: 'CP-FIN-06-07', empleado: 'E-05', datos: { moneda_origen: 'USD', cantidad: 10 },  montos: [RECHAZO, 100000] },
   { id: 'CP-FIN-06-08', empleado: 'E-04', datos: { moneda_origen: 'USD', monto_ars: 1 }, montos: [RECHAZO, 1000000] },
+  // RN-03: los pesos los calcula el backend (dólares × cotización, a 2 decimales);
+  // un monto_ars que difiere en más de 1 peso se rechaza pidiendo ajustar los dólares.
+  { id: 'CP-FIN-06-11', empleado: 'E-04', datos: { moneda_origen: 'USD', monto_origen: 1000, cotizacion_usada: 1000, monto_ars: 1000000 }, montos: [1000000] },
+  { id: 'CP-FIN-06-12', empleado: 'E-05', datos: { moneda_origen: 'USD', cantidad: 10, cotizacion_usada: 1000 }, montos: [100000] },
+  { id: 'CP-FIN-06-13', empleado: 'E-05', datos: { moneda_origen: 'USD', cantidad: 1, cotizacion_usada: 1052.37, monto_ars: 10524 }, montos: [10523.70] },
+  { id: 'CP-FIN-06-13', empleado: 'E-05', datos: { moneda_origen: 'USD', cantidad: 1, cotizacion_usada: 1052.37, monto_ars: 10525.50 }, montos: [RECHAZO], mensaje: MENSAJE_AJUSTE_USD },
+  // moneda_origen 'USD' para un empleado que cobra en pesos: moneda inconsistente.
+  { id: 'CP-FIN-06-16', empleado: 'E-01', datos: { moneda_origen: 'USD', monto: 800000, cotizacion_usada: 1000 }, montos: [RECHAZO], mensaje: /moneda inconsistente/i },
 ];
 
 const textoResultado = (m) => (m === RECHAZO ? m : `guarda ${m} en pesos`);
@@ -184,8 +223,98 @@ for (const c of casosMovimientos) {
       c.montos.includes(obtenido),
       `se esperaba ${c.montos.map(textoResultado).join(' o ')}; se obtuvo ${typeof obtenido === 'number' ? textoResultado(obtenido) : obtenido}`,
     );
+    if (c.mensaje) assert.match(String(r.body.error), c.mensaje);
   });
 }
+
+// ── Edición de movimientos salariales: PUT /salarios/movimientos/:id ────────
+
+const casosEdicionMovimientos = [
+  { id: 'CP-FIN-06-14', movimiento: MOVIMIENTO_USD_E04.id, datos: { moneda_origen: 'USD', monto_origen: 1000, cotizacion_usada: 1000, monto_ars: 1 } },
+];
+
+for (const c of casosEdicionMovimientos) {
+  test(`${c.id} PUT /salarios/movimientos/${c.movimiento} con ${describir(c.datos)} → 400 y el movimiento no cambia`, async (t) => {
+    // Arrange
+    const base = simularBase(t);
+    const original = { ...base.movimientos[c.movimiento] };
+    const { id: _, ...actual } = original;
+    const body = { ...actual, ...c.datos };
+
+    // Act
+    const r = await llamar(appSalarios(), 'PUT', `/movimientos/${c.movimiento}`, body);
+
+    // Assert
+    assert.equal(r.status, 400, `se esperaba HTTP 400; se obtuvo ${detalle(r)}`);
+    assert.match(String(r.body.error), MENSAJE_AJUSTE_USD);
+    assert.equal(base.movimientosActualizados.length, 0, 'no debe actualizarse el movimiento');
+    assert.deepEqual(base.movimientos[c.movimiento], original);
+  });
+}
+
+// En la edición manda la moneda del movimiento guardado: un movimiento viejo en
+// pesos se edita como pesos aunque el empleado hoy cobre en dólares.
+const casosEdicionMovimientosPesos = MOVIMIENTOS_ARS_E04.map(m => (
+  { id: 'CP-FIN-06-15', movimiento: m.id, monedaGuardada: m.moneda_origen, datos: { monto: 600000 } }
+));
+
+for (const c of casosEdicionMovimientosPesos) {
+  test(`${c.id} PUT /salarios/movimientos/${c.movimiento} (guardado en moneda ${JSON.stringify(c.monedaGuardada)}, empleado hoy en USD) con ${describir(c.datos)} sin cotización → 200 y guarda ${c.datos.monto} en pesos`, async (t) => {
+    // Arrange
+    const base = simularBase(t);
+    const { id: _, ...actual } = base.movimientos[c.movimiento];
+    const body = { ...actual, ...c.datos };
+
+    // Act
+    const r = await llamar(appSalarios(), 'PUT', `/movimientos/${c.movimiento}`, body);
+
+    // Assert
+    assert.equal(r.status, 200, `se esperaba HTTP 200; se obtuvo ${detalle(r)}`);
+    const guardado = base.movimientos[c.movimiento];
+    assert.equal(guardado.monto, c.datos.monto);
+    assert.equal(guardado.moneda_origen, c.monedaGuardada, 'la moneda del movimiento no debe cambiar');
+    assert.equal(guardado.cotizacion_usada, null);
+  });
+}
+
+// Un movimiento guardado en dólares se edita con sus propios montos, aunque el
+// empleado hoy cobre en pesos; su moneda no se puede cambiar.
+const EDICION_FRONTEND_USD_E01 = {
+  empleado_id: MOVIMIENTO_USD_E01.empleado_id, categoria_id: MOVIMIENTO_USD_E01.categoria_id,
+  fecha: MOVIMIENTO_USD_E01.fecha, descripcion: 'TEST sueldo editado', monto: 1000000,
+};
+
+test(`CP-FIN-06-17 PUT /salarios/movimientos/${MOVIMIENTO_USD_E01.id} (guardado en USD, empleado hoy en ARS) con solo descripción y monto 1000000 → 200 y conserva los montos en dólares`, async (t) => {
+  // Arrange
+  const base = simularBase(t);
+
+  // Act
+  const r = await llamar(appSalarios(), 'PUT', `/movimientos/${MOVIMIENTO_USD_E01.id}`, EDICION_FRONTEND_USD_E01);
+
+  // Assert
+  assert.equal(r.status, 200, `se esperaba HTTP 200; se obtuvo ${detalle(r)}`);
+  const guardado = base.movimientos[MOVIMIENTO_USD_E01.id];
+  assert.equal(guardado.descripcion, EDICION_FRONTEND_USD_E01.descripcion);
+  assert.equal(guardado.moneda_origen, 'USD');
+  assert.equal(guardado.monto_origen, 1000);
+  assert.equal(guardado.cotizacion_usada, 1000);
+  assert.equal(guardado.monto, 1000000);
+});
+
+test(`CP-FIN-06-17 PUT /salarios/movimientos/${MOVIMIENTO_USD_E01.id} (guardado en USD) con moneda_origen "ARS" → 400 y el movimiento no cambia`, async (t) => {
+  // Arrange
+  const base = simularBase(t);
+  const original = { ...base.movimientos[MOVIMIENTO_USD_E01.id] };
+
+  // Act
+  const r = await llamar(appSalarios(), 'PUT', `/movimientos/${MOVIMIENTO_USD_E01.id}`, { ...EDICION_FRONTEND_USD_E01, moneda_origen: 'ARS' });
+
+  // Assert
+  assert.equal(r.status, 400, `se esperaba HTTP 400; se obtuvo ${detalle(r)}`);
+  assert.match(String(r.body.error), /no se puede cambiar la moneda/i);
+  assert.equal(base.movimientosActualizados.length, 0, 'no debe actualizarse el movimiento');
+  assert.deepEqual(base.movimientos[MOVIMIENTO_USD_E01.id], original);
+});
 
 // ── Alta de empleados: POST /salarios/empleados ─────────────────────────────
 
