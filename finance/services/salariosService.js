@@ -23,6 +23,67 @@ function mapearErrorDuplicado(error) {
   return Object.assign(new Error('El registro ya existe.'), { status: 409 })
 }
 
+const presente = (valor) => valor !== undefined && valor !== null && valor !== ''
+
+// Alta: moneda_origen 'USD' solo es válida para empleados que cobran en dólares.
+function validarMonedaOrigen(empleado, moneda_origen) {
+  if (moneda_origen === 'USD' && empleado.moneda !== 'USD') {
+    throw Object.assign(
+      new Error(`Moneda inconsistente con el empleado: se informó USD pero el empleado cobra en ${empleado.moneda || 'ARS'}.`),
+      { status: 400 }
+    )
+  }
+}
+
+// La moneda de un movimiento guardado no se puede cambiar en la edición.
+function validarMonedaSinCambios(guardado, moneda_origen) {
+  const monedaGuardada = guardado.moneda_origen || 'ARS'
+  if (presente(moneda_origen) && moneda_origen !== monedaGuardada) {
+    throw Object.assign(
+      new Error(`No se puede cambiar la moneda del movimiento: está registrado en ${monedaGuardada} y se envió ${moneda_origen}.`),
+      { status: 400 }
+    )
+  }
+}
+
+// RN-03 (docs/convencion-identificadores.md, sección 6). Los pesos que se guardan
+// siempre los calcula el backend: dólares × cotización, a 2 decimales. Si se envió
+// un monto en pesos (monto_ars o monto) que difiere en más de 1 peso, se rechaza.
+function convertirUsdAPesos(usd, cotizacion, { monto_ars, monto }) {
+  if (!(cotizacion > 0))
+    throw Object.assign(new Error('Los movimientos en dólares requieren la cotización usada (mayor a 0).'), { status: 400 })
+  if (!(usd > 0))
+    throw Object.assign(new Error('El monto en dólares debe ser mayor a cero.'), { status: 400 })
+
+  const ars = Math.round(usd * cotizacion * 100) / 100
+  const arsEnviado = presente(monto_ars) ? monto_ars : monto
+  if (presente(arsEnviado) && !(Math.abs(Number(arsEnviado) - ars) <= 1)) {
+    throw Object.assign(
+      new Error(`El monto en pesos (${arsEnviado}) no coincide con USD ${usd} × ${cotizacion} = ${ars}. Ajustá el monto en dólares.`),
+      { status: 400 }
+    )
+  }
+  return { usd, cotizacion, ars }
+}
+
+// Alta: los dólares salen del empleado (por hora o turno: monto base × cantidad;
+// mensual: el monto_origen enviado o, si no viene, el monto base).
+function calcularMontosUsdAlta(empleado, body) {
+  const base = Number(empleado.monto_base) || 0
+  const usd = empleado.tipo_salario === 'mensual'
+    ? (presente(body.monto_origen) ? Number(body.monto_origen) : base)
+    : base * Number(body.cantidad)
+  return convertirUsdAPesos(usd, Number(body.cotizacion_usada), body)
+}
+
+// Edición: solo cuenta el movimiento guardado, no el empleado actual. monto_origen y
+// cotización son los enviados o, si no vienen, los guardados.
+function calcularMontosUsdEdicion(guardado, body) {
+  const usd = Number(presente(body.monto_origen) ? body.monto_origen : guardado.monto_origen)
+  const cotizacion = Number(presente(body.cotizacion_usada) ? body.cotizacion_usada : guardado.cotizacion_usada)
+  return convertirUsdAPesos(usd, cotizacion, body)
+}
+
 class SalariosService {
   // ── Empleados ────────────────────────────────────────────────
 
@@ -271,6 +332,18 @@ class SalariosService {
     return { data, total: data.length }
   }
 
+  async obtenerMovimientoPorId(id) {
+    const { data, error } = await supabase
+      .from('movimientos_salario')
+      .select('*')
+      .eq('id', id)
+      .single()
+    // PGRST116: .single() sin filas
+    if (error && error.code && error.code !== 'PGRST116') throw error
+    if (!data) throw Object.assign(new Error('Movimiento no encontrado'), { status: 404 })
+    return data
+  }
+
   async crearMovimiento(body, email = null) {
     const {
       empleado_id, categoria_id, monto, fecha, descripcion, cantidad,
@@ -280,13 +353,15 @@ class SalariosService {
       throw Object.assign(new Error('Faltan campos obligatorios: empleado_id, categoria_id, fecha'), { status: 400 })
 
     let montoFinal = Number(monto) || 0
+    const empleado = await this.obtenerEmpleadoPorId(empleado_id)
+    validarMonedaOrigen(empleado, moneda_origen)
+    // En el alta, el movimiento es en dólares si el empleado cobra en dólares
+    const usd = empleado.moneda === 'USD' ? calcularMontosUsdAlta(empleado, body) : null
 
-    if (moneda_origen === 'USD' && monto_ars) {
-      // Movimiento en dólares: el frontend ya calculó el equivalente ARS
-      montoFinal = Number(monto_ars)
+    if (usd) {
+      montoFinal = usd.ars
     } else if (cantidad !== undefined) {
       // Movimiento ARS con cantidad (hora/turno): el backend recalcula
-      const empleado = await this.obtenerEmpleadoPorId(empleado_id)
       const base = Number(empleado.monto_base) || 0
       const cant = Number(cantidad)
       montoFinal = empleado.tipo_salario === 'mensual' ? base : base * cant
@@ -300,10 +375,10 @@ class SalariosService {
       .insert([{
         empleado_id, categoria_id, monto: montoFinal, fecha, descripcion,
         cuenta_contrapartida: body.cuenta_contrapartida || null,
-        moneda_origen:    moneda_origen || 'ARS',
-        monto_origen:     monto_origen  ? Number(monto_origen)     : null,
-        cotizacion_usada: cotizacion_usada ? Number(cotizacion_usada) : null,
-        monto_ars:        moneda_origen === 'USD' ? montoFinal : null,
+        moneda_origen:    usd ? 'USD' : (moneda_origen || 'ARS'),
+        monto_origen:     usd ? usd.usd : (monto_origen ? Number(monto_origen) : null),
+        cotizacion_usada: usd ? usd.cotizacion : (cotizacion_usada ? Number(cotizacion_usada) : null),
+        monto_ars:        usd ? usd.ars : null,
         created_by:       email,
       }])
       .select(`
@@ -317,13 +392,20 @@ class SalariosService {
   }
 
   async actualizarMovimiento(id, body) {
-    const { empleado_id, categoria_id, monto, fecha, descripcion, cantidad } = body
+    const { empleado_id, categoria_id, monto, fecha, descripcion, cantidad, moneda_origen } = body
     if (!empleado_id || !categoria_id || !fecha)
       throw Object.assign(new Error('Faltan campos obligatorios: empleado_id, categoria_id, fecha'), { status: 400 })
 
     let montoFinal = Number(monto) || 0
+    const guardado = await this.obtenerMovimientoPorId(id)
+    // En la edición manda el movimiento guardado: su moneda no cambia y, si es en
+    // dólares, los montos salen de él y no del empleado actual
+    validarMonedaSinCambios(guardado, moneda_origen)
+    const usd = guardado.moneda_origen === 'USD' ? calcularMontosUsdEdicion(guardado, body) : null
 
-    if (cantidad !== undefined) {
+    if (usd) {
+      montoFinal = usd.ars
+    } else if (cantidad !== undefined) {
       const empleado = await this.obtenerEmpleadoPorId(empleado_id)
       const base = Number(empleado.monto_base) || 0
       const cant = Number(cantidad)
@@ -333,9 +415,12 @@ class SalariosService {
     if (!montoFinal || montoFinal === 0)
       throw Object.assign(new Error('El monto no puede ser cero'), { status: 400 })
 
+    const cambios = { empleado_id, categoria_id, monto: montoFinal, fecha, descripcion, cuenta_contrapartida: body.cuenta_contrapartida || null }
+    if (usd) Object.assign(cambios, { moneda_origen: 'USD', monto_origen: usd.usd, cotizacion_usada: usd.cotizacion, monto_ars: usd.ars })
+
     const { data, error } = await supabase
       .from('movimientos_salario')
-      .update({ empleado_id, categoria_id, monto: montoFinal, fecha, descripcion, cuenta_contrapartida: body.cuenta_contrapartida || null })
+      .update(cambios)
       .eq('id', id)
       .select(`
         *,
