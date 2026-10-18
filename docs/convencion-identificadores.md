@@ -1,7 +1,7 @@
 # Convención de identificadores y catálogo de requisitos
 
 **NexaCore · Módulo Financiero · TP Integrador de Calidad de Software**
-Versión 1.2 · 18 de octubre de 2026 · Responsable: Pilar
+Versión 1.3 · 18 de octubre de 2026 · Responsable: Pilar
 
 Este documento define cómo se nombra cada elemento del proceso de calidad para que todo quede trazable: requisito → caso de prueba → test automatizado → defecto → corrección → prueba de regresión.
 
@@ -103,3 +103,15 @@ El resultado se redondea a 2 decimales. Si queda en 0 o menos, la fila se rechaz
 "Finanzas" incluye movimientos, comprobantes, suscripciones, importaciones y cotización del dólar.
 
 **Permiso manual** es el permiso asignado **a un usuario en particular** en la matriz del módulo `finance`. Los permisos cargados **por rol** en la matriz no habilitan Finanzas a quien no es mando alto: así, ningún rol completo (por ejemplo, todos los Contables) accede sin que se le dé permiso a cada persona. Aclaración del 18/10/2026; la regla queda garantizada por el código, no por la configuración de la matriz.
+
+### RN-03 · Sueldos en dólares
+
+Definida el 18/10/2026. Aplica al registro y a la edición de movimientos salariales de empleados en dólares (REQ-FIN-06).
+
+| # | Regla |
+|---|---|
+| 1 | Todo movimiento en dólares requiere la **cotización usada** (`cotizacion_usada` mayor a 0). Si falta, HTTP 400 |
+| 2 | **Monto en dólares:** para empleados por hora o por turno lo calcula el backend (monto base × cantidad); para mensuales es el enviado (por defecto, el monto base) y es el único que se ajusta |
+| 3 | **Monto en pesos:** lo calcula el backend como dólares × cotización, redondeado a 2 decimales, y es el que se guarda |
+| 4 | Si se envía un monto en pesos que difiere en **más de 1 peso** del cálculo, HTTP 400 con un mensaje que indique ajustar el monto en dólares. La tolerancia cubre el redondeo del frontend |
+| 5 | La edición de un movimiento en dólares aplica las mismas reglas |

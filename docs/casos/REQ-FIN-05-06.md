@@ -1,6 +1,6 @@
 # REQ-FIN-05 y REQ-FIN-06 · Liquidación de sueldos en pesos y en dólares
 
-**Riesgo:** R-01 (alto) · **Versión:** 1.2, 18/10/2026
+**Riesgo:** R-01 (alto) · **Versión:** 1.3, 18/10/2026 · **Oráculo para dólares:** regla RN-03
 
 **Precondiciones comunes:** usuario Dirección activo; empleados del seed (E-01 a E-09, ver `docs/datos-de-prueba.md`); cotización fija de prueba: compra 1000, venta 1050.
 **Pasos comunes:** registrar un movimiento salarial para el empleado indicado y consultar el monto guardado en pesos.
@@ -44,6 +44,10 @@ Los casos en dólares son de sistema porque la conversión la hace el frontend c
 | CP-FIN-06-07 | Equivalencia (inválida) | Empleado E-05 en USD, cantidad 10, sin `monto_ars` | Se rechaza o se convierte a pesos | Nunca se guarda 100 (dólares) como pesos | Alta | I |
 | CP-FIN-06-08 | Equivalencia (inválida) | E-04, `monto_ars` 1 con cotización 1000 | Se rechaza o se recalcula | El monto guardado es 1000000.00 o HTTP 400 | Alta | I |
 | CP-FIN-06-09 | Equivalencia (inválida) | Alta de empleado en USD sin `cotizacion_tipo` | Se rechaza | HTTP 400 y ningún empleado nuevo | Media | U |
+| CP-FIN-06-11 | Equivalencia (válida, RN-03) | E-04 mensual, `monto_origen` 1000, `cotizacion_usada` 1000, `monto_ars` 1000000 | Se guarda | HTTP 201 y monto = 1000000.00 | Alta | U |
+| CP-FIN-06-12 | Equivalencia (válida, RN-03) | E-05 por hora, cantidad 10, `cotizacion_usada` 1000, sin `monto_ars` | El backend calcula los pesos | HTTP 201 y monto = 100000.00 | Alta | U |
+| CP-FIN-06-13 | Valor límite (tolerancia, RN-03) | E-05 por hora, cantidad 1, `cotizacion_usada` 1052.37 (cálculo exacto: 10523.70). Variante 1: `monto_ars` 10524 (redondeado como lo hace el frontend, difiere 0,30). Variante 2: `monto_ars` 10525.50 (difiere 1,80) | La variante 1 se acepta y se guarda el cálculo exacto; la variante 2 se rechaza | Variante 1: HTTP 201 y monto = 10523.70 · Variante 2: HTTP 400 | Alta | U |
+| CP-FIN-06-14 | Transición (RN-03) | Editar un movimiento en USD de E-04 enviando `monto_ars` 1 | Se rechaza | HTTP 400 y el movimiento no cambia | Alta | U |
 
 ## Valores límite y validaciones
 
@@ -71,4 +75,4 @@ Los casos en dólares son de sistema porque la conversión la hace el frontend c
 |---|---|---|---|
 | 18/10/2026 | CP-FIN-05-01 | Los datos de entrada incluyen el monto propuesto por el frontend | La versión 1.0 asumía que el backend calcula el sueldo mensual; el sistema asigna esa tarea al frontend, que propone el monto base y permite ajustarlo. El resultado esperado (800.000) no cambia. El caso no detectaba un defecto, sino un supuesto equivocado del diseño |
 
-**Hallazgos relacionados:** 05-11, 05-12 → H-34 · 06-10 → H-35 · 06-07, 06-08 → H-21, H-36 · 05-06, 05-07 → H-20 · 05-09, 05-10 → H-22.
+**Hallazgos relacionados:** 05-11, 05-12 → H-34 · 06-10 → H-35 · 06-07, 06-08, 06-11 a 06-14 → H-21, H-36 · 05-06, 05-07 → H-20 · 05-09, 05-10 → H-22.

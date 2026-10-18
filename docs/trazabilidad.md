@@ -11,7 +11,7 @@ Se actualiza cada vez que se diseña un caso, se automatiza un test o se registr
 | REQ-FIN-03 | CP-FIN-03-01 a 03-15 | `test/finanzas.montos.test.js` (03-01 a 03-04, 03-11 a 03-15) | DEF-005 (#22) | Con defectos abiertos |
 | REQ-FIN-04 | CP-FIN-04-01 a 04-12 | `test/finanzas.montos.test.js` (04-10 a 04-12) | DEF-006 (#23) | Con defectos abiertos |
 | REQ-FIN-05 | CP-FIN-05-01 a 05-12 | `test/finanzas.sueldos.test.js` (05-01 a 05-10) | DEF-009 (#26), DEF-011 (#28) | Con defectos abiertos |
-| REQ-FIN-06 | CP-FIN-06-01 a 06-10 | `test/finanzas.sueldos.test.js` (06-07 a 06-09) | DEF-010 (#27) | Con defectos abiertos |
+| REQ-FIN-06 | CP-FIN-06-01 a 06-14 | `test/finanzas.sueldos.test.js` (06-07 a 06-09) | DEF-010 (#27) | Con defectos abiertos |
 | REQ-FIN-07 | | | | Sin casos |
 | REQ-FIN-08 | CP-FIN-08-01 a 08-09 | | | Diseñado |
 | REQ-FIN-09 | | | | Sin casos |
