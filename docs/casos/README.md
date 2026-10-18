@@ -45,5 +45,6 @@ Cuando un caso está mal diseñado (por ejemplo, prueba una regla que el sistema
 | `REQ-FIN-04.md` | Importación por endpoint | R-03 |
 | `REQ-FIN-05-06.md` | Sueldos en pesos y en dólares | R-01 |
 | `REQ-FIN-08.md` | Alertas de vencimiento | R-08 |
+| `REQ-FIN-09.md` | Comprobantes con OCR | R-05 |
 | `REQ-FIN-14-15.md` | Libro diario y PDF | R-04 |
 | `REQ-FIN-16-17.md` | Permisos por rol | R-02 |

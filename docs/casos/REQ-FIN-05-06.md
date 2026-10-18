@@ -1,6 +1,6 @@
 # REQ-FIN-05 y REQ-FIN-06 · Liquidación de sueldos en pesos y en dólares
 
-**Riesgo:** R-01 (alto) · **Versión:** 1.3, 18/10/2026 · **Oráculo para dólares:** regla RN-03
+**Riesgo:** R-01 (alto) · **Versión:** 1.4, 18/10/2026 · **Oráculo para dólares:** regla RN-03
 
 **Precondiciones comunes:** usuario Dirección activo; empleados del seed (E-01 a E-09, ver `docs/datos-de-prueba.md`); cotización fija de prueba: compra 1000, venta 1050.
 **Pasos comunes:** registrar un movimiento salarial para el empleado indicado y consultar el monto guardado en pesos.
@@ -60,6 +60,20 @@ Los casos en dólares son de sistema porque la conversión la hace el frontend c
 | CP-FIN-05-08 | Equivalencia (inválida) | Cantidad `abc` | Se rechaza | HTTP 400 | Media | U |
 | CP-FIN-05-09 | Equivalencia (inválida) | Alta de empleado con tipo_salario `semanal` | Se rechaza | HTTP 400 y ningún empleado nuevo | Media | U |
 | CP-FIN-05-10 | Transición | Editar E-02 (por hora) cambiando solo el apellido | Conserva la estructura por hora | tipo_salario sigue en `hora` | Media | I |
+
+## Casos agregados durante la corrección (18/10/2026)
+
+| ID | Técnica | Datos de entrada | Resultado esperado | Criterio de aceptación | Prior. | Nivel |
+|---|---|---|---|---|---|---|
+| CP-FIN-05-13 | Equivalencia (inválida) | Editar un movimiento en pesos existente con monto −1000 | Se rechaza | HTTP 400 y el movimiento no cambia | Alta | U |
+| CP-FIN-05-14 | Transición | Editar E-04 (USD) enviando solo un apellido nuevo | Se conservan la moneda USD y los cuatro datos de cotización | moneda = USD y cotización sin cambios | Alta | U |
+| CP-FIN-05-15 | Equivalencia (inválida) | Alta de empleado con moneda `EUR` | Se rechaza | HTTP 400 y ningún empleado nuevo | Media | U |
+| CP-FIN-05-16 | Transición | Editar E-02 enviando solo un apellido nuevo; variante enviando email vacío | Se conservan email y teléfono; con email vacío, el email se borra a propósito | Email y teléfono sin cambios / email = null | Media | U |
+| CP-FIN-06-15 | Transición (RN-03) | Editar un movimiento guardado en pesos (moneda ARS o nula) de un empleado que hoy cobra en USD | Se edita como pesos, sin exigir cotización | HTTP 200, se guarda el monto en pesos y la moneda no cambia | Alta | U |
+| CP-FIN-06-16 | Equivalencia (inválida, RN-03) | Alta de movimiento con moneda_origen USD para E-01 (cobra en pesos) | Se rechaza por moneda inconsistente | HTTP 400 sin inserción | Alta | U |
+| CP-FIN-06-17 | Transición (RN-03) | Editar un movimiento guardado en USD de un empleado que hoy cobra en pesos, enviando solo descripción y monto (como el frontend); variante enviando moneda_origen ARS | Se conservan los datos en dólares; no se puede cambiar la moneda | HTTP 200 sin cambios en los datos USD / HTTP 400 | Alta | U |
+
+Durante la corrección de DEF-011 se encontró que el defecto era más amplio: editar un empleado sin enviar todos los campos también borraba los datos de cotización, el email y el teléfono. CP-FIN-05-14 y 05-16 cubren esos efectos. El rojo de CP-FIN-05-16 se verificó ejecutándolo sobre el código anterior (`b776d88`), sin captura.
 
 ## Formulario de sueldos (interfaz)
 

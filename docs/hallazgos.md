@@ -46,6 +46,7 @@ Surgen de la lectura del código (17 y 18/10/2026). **No son defectos**: cada un
 | H-34 | El campo de monto del formulario de sueldos solo admite dígitos y punto: `800.000` se guarda como 800 | CP-FIN-05-11, 05-12 |
 | H-35 | Al llegar la cotización, el formulario de sueldos reemplaza sin aviso el monto que el usuario ya escribió | CP-FIN-06-10 |
 | H-36 | En sueldos en dólares, si el usuario edita el monto, `monto_origen × cotización` deja de coincidir con `monto_ars`; ni el frontend ni el backend lo controlan | CP-FIN-06-07, 06-08 |
+| H-47 | Con la regla RN-03, un sueldo en dólares solo puede ajustarse en dólares, pero el formulario de edición del frontend solo envía el monto en pesos: el monto de un sueldo en dólares no puede modificarse desde la pantalla (sí la descripción y la fecha). Además, al editar un movimiento en dólares la cantidad de horas o turnos se ignora | Mejora del frontend pendiente |
 | H-24 | El backend no consulta ningún servicio de cotización: la consulta externa está en el frontend (`dolarService.js`); el POST guarda la cotización sin validar | Ver nota al final |
 
 ## Suscripciones
