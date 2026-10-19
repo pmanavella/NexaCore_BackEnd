@@ -13,7 +13,7 @@ Se actualiza cada vez que se diseña un caso, se automatiza un test o se registr
 | REQ-FIN-05 | CP-FIN-05-01 a 05-16 | `test/finanzas.sueldos.test.js` (05-01 a 05-10, 05-13 a 05-16) | DEF-009 (#26), DEF-011 (#28) | Corregido, pendiente de merge y verificación |
 | REQ-FIN-06 | CP-FIN-06-01 a 06-17 | `test/finanzas.sueldos.test.js` (06-07 a 06-09, 06-11 a 06-17) | DEF-010 (#27) | Corregido, pendiente de merge y verificación |
 | REQ-FIN-07 | CP-FIN-07-01 a 07-05 | `test/finanzas.suscripciones-validacion.test.js` (07-01 a 07-04); 07-05 cubierto por `test/finanzas.suscripciones.test.js` | DEF-016 (#34) | Corregido, pendiente de merge y verificación |
-| REQ-FIN-08 | CP-FIN-08-01 a 08-09 | `test/finanzas.suscripciones.test.js` (08-01 a 08-08) | — | Ejecutado sin defectos |
+| REQ-FIN-08 | CP-FIN-08-01 a 08-09 | `test/finanzas.suscripciones.test.js` (08-01 a 08-08), `test/finanzas.suscripciones.test.js` (08-01 a 08-08, servicio), `test/finanzas.suscripciones-endpoint.test.js` (08-06) | DEF-017 (#35) | Con defectos abiertos |
 | REQ-FIN-09 | CP-FIN-09-01 | `test/finanzas.comprobantes.test.js` | — | Ejecutado sin defectos |
 | REQ-FIN-10 | | | | Sin casos |
 | REQ-FIN-11 | | | | Sin casos |
@@ -51,8 +51,9 @@ Antes de abrir un issue, tomar el siguiente número libre y anotarlo aquí.
 | DEF-014 | #32 | La importación por Excel rechaza fechas DD/MM/YYYY aunque la plantilla anuncia ese formato | CP-FIN-04-03 | Media | 2026-10-19 | 2026-10-19 · `fix/DEF-012-suscripcion-importacion` | CP-FIN-04-03 |
 | DEF-015 | #33 | La importación por Excel acepta fechas inexistentes (2026-02-31) | CP-FIN-04-04 | Media | 2026-10-19 | 2026-10-19 · `fix/DEF-015-fechas-inexistentes` (32668b8) | CP-FIN-04-04, 13, 14, 15 |
 | DEF-016 | #34 | Una moneda o frecuencia inválida en una suscripción se reemplaza en silencio por ARS o mensual | CP-FIN-07-01 a 07-04 | Media | 2026-10-19 | 2026-10-19 · `fix/DEF-016-suscripciones-moneda-frecuencia` (5e1d73d) | CP-FIN-07-01 a 07-04; 07-05 |
+| DEF-017 | #35 | Con dias=0 la alerta de vencimientos devuelve los próximos 7 días en vez de solo los de hoy | CP-FIN-08-06 | Baja | 2026-10-19 | — | CP-FIN-08-06 |
 
-Siguiente número libre: **DEF-017**.
+Siguiente número libre: **DEF-018**.
 
 ## Ejecuciones registradas
 
