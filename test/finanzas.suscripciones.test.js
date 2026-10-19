@@ -113,7 +113,7 @@ test('CP-FIN-08-05 día de vencimiento 31 evaluado en febrero → vence el últi
   assert.equal(r[0].proxima_fecha_vencimiento, '2026-02-28');
 });
 
-test('CP-FIN-08-06 dias=0 → solo las que vencen hoy', async (t) => {
+test('servicio con dias=0 → solo las que vencen hoy (el caso CP-FIN-08-06 completo, por el endpoint, está en finanzas.suscripciones-endpoint.test.js)', async (t) => {
   // Arrange
   fijarHoy(t);
   simularVencimientos(t, { suscripciones: [
