@@ -21,5 +21,8 @@
 | CP-FIN-04-10 | Equivalencia (RN-01) | Monto como texto `1.234,56` | Se importa por 1234,56 | monto = 1234.56 | Alta | U |
 | CP-FIN-04-11 | Equivalencia (RN-01) | Monto como texto `1.234` | Se importa por 1234 | monto = 1234.00 | Alta | U |
 | CP-FIN-04-12 | Equivalencia (RN-01) | Monto como texto `1,5` | Se importa por 1,50 | monto = 1.50 | Alta | U |
+| CP-FIN-04-13 | Equivalencia (inválida) | Fecha `31/02/2026` (formato DD/MM/AAAA) | Se rechaza como fecha inválida | parsearFecha devuelve null | Alta | U |
+| CP-FIN-04-14 | Valor límite | Fecha `2028-02-29` (año bisiesto) | Se acepta | parsearFecha devuelve 2028-02-29 | Alta | U |
+| CP-FIN-04-15 | Valor límite | Fecha `2026-02-29` (año no bisiesto) | Se rechaza como fecha inválida | parsearFecha devuelve null | Alta | U |
 
-**Hallazgos relacionados:** 04-01 → H-02 · 04-02, 04-06 → H-13 · 04-03, 04-04 → H-14 · 04-05, 04-09 → H-15.
+**Hallazgos relacionados:** 04-01 → H-02 · 04-02, 04-06 → H-13 · 04-03, 04-04, 04-13 a 04-15 → H-14 · 04-05, 04-09 → H-15.

@@ -14,6 +14,9 @@ const casos = [
   { desc: 'valor vacío devuelve null', entrada: '', esperado: null },
   { desc: 'valor ausente devuelve null', entrada: undefined, esperado: null },
   { desc: 'texto que no es fecha devuelve null', entrada: 'no es una fecha', esperado: null },
+  { desc: 'fecha DD/MM/YYYY inexistente devuelve null (CP-FIN-04-13, DEF-015)', entrada: '31/02/2026', esperado: null },
+  { desc: '29 de febrero de año bisiesto se acepta (CP-FIN-04-14)', entrada: '2028-02-29', esperado: '2028-02-29' },
+  { desc: '29 de febrero de año no bisiesto devuelve null (CP-FIN-04-15, DEF-015)', entrada: '2026-02-29', esperado: null },
 ];
 
 for (const c of casos) {
