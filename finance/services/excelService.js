@@ -1,29 +1,12 @@
 const XLSX = require('xlsx');
 const supabase = require('../../config/supabase');
 const { parsearMonto } = require('../utils/montos');
+const { parsearFecha } = require('../utils/fechas');
+const { CATEGORIAS_VALIDAS, TIPOS_VALIDOS } = require('../config/movimientos');
 
-const CATEGORIAS_VALIDAS = ['Tecnología', 'RRHH', 'Insumos', 'Servicios', 'Inversión', 'Otros','Suscripción'];
-const TIPOS_VALIDOS = ['Ingreso', 'Gasto'];
 const COLUMNAS_REQUERIDAS = ['fecha', 'descripcion', 'categoria', 'tipo', 'monto'];
 
 class ExcelService {
-  parsearFecha(valor) {
-    if (!valor) return null;
-    if (typeof valor === 'number') {
-      const date = new Date((valor - 25569) * 86400 * 1000);
-      return date.toISOString().split('T')[0];
-    }
-    const str = String(valor).trim();
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
-      const [d, m, y] = str.split('/');
-      return `${y}-${m}-${d}`;
-    }
-    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
-    const parsed = new Date(str);
-    if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
-    return null;
-  }
-
   validarFila(fila, index) {
     const errores = [];
     const num = index + 2;
@@ -73,7 +56,7 @@ class ExcelService {
       valido: errores.length === 0,
       totalFilas: filas.length,
       errores,
-      preview: filas.slice(0, 5).map(f => ({ ...f, fecha: this.parsearFecha(f.fecha), monto: parsearMonto(f.monto) }))
+      preview: filas.slice(0, 5).map(f => ({ ...f, fecha: parsearFecha(f.fecha), monto: parsearMonto(f.monto) }))
     };
   }
 
@@ -85,7 +68,7 @@ class ExcelService {
       throw Object.assign(new Error('El archivo tiene errores de validación'), { status: 400, errores: errores.slice(0, 20) });
 
     const registros = filas.map(f => ({
-      fecha: this.parsearFecha(f.fecha),
+      fecha: parsearFecha(f.fecha),
       descripcion: String(f.descripcion).trim(),
       categoria: String(f.categoria).trim(),
       tipo: String(f.tipo).trim(),
