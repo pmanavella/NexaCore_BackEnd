@@ -94,7 +94,7 @@ H-01 a H-47 surgen de la lectura del código (17 y 18/10/2026); los posteriores 
 
 | ID | Hallazgo | Casos |
 |---|---|---|
-| H-46 | 4 de los 8 tests de `documentExtraction.test.js` fallaban en `develop` desde el commit `1f04ba4` (14/09), sin que nadie lo notara durante un mes porque los tests no se ejecutaban en ningún pipeline. No era un defecto del código: los tests quedaron desactualizados por dos cambios de regla intencionales (renglones netos contra subtotal; categoría inválida como advertencia). Se actualizaron en develop con el commit 85f7590, antes de la línea base (8 de 8 en verde); el pull request #29, con la misma actualización, se cerró sin mergear. | — |
+| H-46 | 4 de los 8 tests de `documentExtraction.test.js` fallaban en `develop` desde el commit `1f04ba4` (14/09), sin que nadie lo notara durante un mes porque los tests no se ejecutaban en ningún pipeline. No era un defecto del código: los tests quedaron desactualizados por dos cambios de regla intencionales (renglones netos contra subtotal; categoría inválida como advertencia). Se actualizaron con el pull request #29 (commit 85f7590), mergeado a develop el 18/10 (d443536), antes de la línea base (8 de 8 en verde). El merge se hizo sin la revisión de otra integrante que exige el plan de pruebas; la revisión queda pendiente | — |
 
 ## Nota sobre la cotización del dólar (H-24)
 
