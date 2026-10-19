@@ -21,3 +21,5 @@ build/
 schema_prod.sql
 supabase/.temp/
 .env
+coverage/
+.scannerwork/
