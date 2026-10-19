@@ -1,6 +1,6 @@
 # Hallazgos de auditoría
 
-Surgen de la lectura del código (17 y 18/10/2026). **No son defectos**: cada uno se verifica con su caso de prueba y, si el caso falla, se registra como `DEF-NNN` en GitHub Issues. Los marcados como *inferido* no fueron ejecutados ni siquiera en la auditoría.
+H-01 a H-47 surgen de la lectura del código (17 y 18/10/2026); los posteriores indican en la descripción cuándo y cómo se detectaron. **No son defectos**: cada uno se verifica con su caso de prueba y, si el caso falla, se registra como `DEF-NNN` en GitHub Issues. Los marcados como *inferido* no fueron ejecutados ni siquiera en la auditoría.
 
 ## Alcance, estructura y entorno
 
@@ -15,6 +15,7 @@ Surgen de la lectura del código (17 y 18/10/2026). **No son defectos**: cada un
 | H-07 | Solo 8 tests propios del módulo; el frontend no tiene tests y el CI no ejecuta pruebas | — |
 | H-08 | El backend declara Node 18, pero supabase-js requiere Node 20 o superior | Smoke tras actualizar |
 | H-09 | Sin análisis estático, linter ni cobertura; el frontend no tiene CI | — |
+| H-48 | `npm audit` informa 10 vulnerabilidades en dependencias del backend (1 crítica y 7 altas), entre ellas `xlsx`, que usa la importación por Excel. Riesgo de dependencias, no defecto del módulo. Detectado por Victoria (19/10) | — (se verifica con `npm audit`) |
 
 ## Validación de movimientos
 
@@ -29,12 +30,13 @@ Surgen de la lectura del código (17 y 18/10/2026). **No son defectos**: cada un
 | ID | Hallazgo | Casos |
 |---|---|---|
 | H-13 | Endpoint Excel: un monto `0` numérico pasa la validación y aborta el lote; la inserción por lotes no es transaccional y deja importaciones parciales | CP-FIN-04-02, 04-06 |
-| H-14 | Endpoint Excel: valida la fecha con un parser distinto del que guarda; rechaza `31/12/2026` (formato de la plantilla) y deja pasar `2026-02-31` | CP-FIN-04-03, 04-04 |
+| H-14 | Endpoint Excel: valida la fecha con un parser distinto del que guarda; rechaza `31/12/2026` (formato de la plantilla) y deja pasar `2026-02-31`. Confirmado como DEF-014 (#32) y DEF-015 (#33); DEF-015 corregido en 32668b8 | CP-FIN-04-03, 04-04, 04-13 a 04-15 |
 | H-15 | Endpoint Excel: rechaza `" Gasto"` aunque al guardar recorta; un encabezado con acento no coincide; el detalle de errores no llega al cliente | CP-FIN-04-05, 04-09 |
 | H-16 | Migración: `"1.234,56"` se guarda como 1,23 y `"1,5"` como 15 | CP-FIN-03-01, 03-02 |
 | H-17 | Migración: la categoría se asigna por coincidencia parcial; el concepto `"a"` queda como Tecnología | CP-FIN-03-06 |
 | H-18 | Migración: confirmar y revertir exigen el rol `Admin`, que no existe; Dirección no puede hacerlo | CP-FIN-03-07 |
 | H-19 | Migración: revertir no es transaccional y borra registros aunque se hayan editado después | CP-FIN-03-08 |
+| H-49 | `parsearFecha`: el último recurso (`new Date`) acepta formatos que la plantilla no anuncia y convierte en silencio una fecha inexistente en otra válida (`2026/02/31` → 2026-03-03). Detectado al corregir DEF-015 (19/10); fuera de su alcance | — |
 
 ## Sueldos y cotización
 
@@ -92,7 +94,7 @@ Surgen de la lectura del código (17 y 18/10/2026). **No son defectos**: cada un
 
 | ID | Hallazgo | Casos |
 |---|---|---|
-| H-46 | 4 de los 8 tests de `documentExtraction.test.js` fallaban en `develop` desde el commit `1f04ba4` (14/09), sin que nadie lo notara durante un mes porque los tests no se ejecutaban en ningún pipeline. No era un defecto del código: los tests quedaron desactualizados por dos cambios de regla intencionales (renglones netos contra subtotal; categoría inválida como advertencia). Se actualizaron en el pull request #29, a revisar por Victoria | — |
+| H-46 | 4 de los 8 tests de `documentExtraction.test.js` fallaban en `develop` desde el commit `1f04ba4` (14/09), sin que nadie lo notara durante un mes porque los tests no se ejecutaban en ningún pipeline. No era un defecto del código: los tests quedaron desactualizados por dos cambios de regla intencionales (renglones netos contra subtotal; categoría inválida como advertencia). Se actualizaron en develop con el commit 85f7590, antes de la línea base (8 de 8 en verde); el pull request #29, con la misma actualización, se cerró sin mergear. | — |
 
 ## Nota sobre la cotización del dólar (H-24)
 
