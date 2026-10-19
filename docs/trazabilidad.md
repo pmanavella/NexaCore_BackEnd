@@ -18,7 +18,7 @@ Se actualiza cada vez que se diseña un caso, se automatiza un test o se registr
 | REQ-FIN-10 | | | | Sin casos |
 | REQ-FIN-11 | | | | Sin casos |
 | REQ-FIN-12 | | | | Sin casos |
-| REQ-FIN-13 | | | | Sin casos |
+| REQ-FIN-13 | CP-FIN-13-01 a 13-12 | `test/dolarService.test.js` del frontend (13-01 a 13-12) | DEF-013 (#31) | Con defectos abiertos |
 | REQ-FIN-14 | CP-FIN-14-01 a 14-07 | | | Diseñado |
 | REQ-FIN-15 | CP-FIN-15-01, 15-02 | | | Diseñado |
 | REQ-FIN-16 | CP-FIN-16-01 a 16-12 | `test/finanzas.permisos.test.js` (16-01 a 16-08, 16-12) | DEF-001 (#18), DEF-002 (#19), DEF-003 (#20) | Corregido, pendiente de merge y verificación |
@@ -45,8 +45,9 @@ Antes de abrir un issue, tomar el siguiente número libre y anotarlo aquí.
 | DEF-010 | #27 | Sueldos en dólares guardados como pesos, sin verificar la conversión | CP-FIN-06-07, 06-08 | Crítica | 2026-10-18 | 2026-10-18 · `fix/DEF-010-sueldos-usd` | CP-FIN-06-07, 08, 11 a 17 |
 | DEF-011 | #28 | Tipo de salario reemplazado en silencio; la edición cambia la estructura de pago | CP-FIN-05-09, 05-10 | Alta | 2026-10-18 | 2026-10-18 · `fix/DEF-009-011-sueldos-validaciones` | CP-FIN-05-09, 10, 14, 15, 16 |
 | DEF-012 | #30 | La importación por Excel rechaza el archivo completo si incluye la categoría Suscripción | CP-FIN-04-01 | Media | 2026-10-19 | — | CP-FIN-04-01 |
+| DEF-013 | #31 | Se acepta una cotización del dólar no numérica (NaN) en lugar de usar la fuente siguiente | CP-FIN-13-09 | Media | 2026-10-19 | — | CP-FIN-13-09 |
 
-Siguiente número libre: **DEF-013**.
+Siguiente número libre: **DEF-014**.
 
 ## Ejecuciones registradas
 
