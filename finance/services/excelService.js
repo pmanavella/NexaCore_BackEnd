@@ -2,7 +2,7 @@ const XLSX = require('xlsx');
 const supabase = require('../../config/supabase');
 const { parsearMonto } = require('../utils/montos');
 
-const CATEGORIAS_VALIDAS = ['Tecnología', 'RRHH', 'Insumos', 'Servicios', 'Inversión', 'Otros'];
+const CATEGORIAS_VALIDAS = ['Tecnología', 'RRHH', 'Insumos', 'Servicios', 'Inversión', 'Otros','Suscripción'];
 const TIPOS_VALIDOS = ['Ingreso', 'Gasto'];
 const COLUMNAS_REQUERIDAS = ['fecha', 'descripcion', 'categoria', 'tipo', 'monto'];
 
