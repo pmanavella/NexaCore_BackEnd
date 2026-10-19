@@ -23,8 +23,7 @@ class ExcelService {
         errores.push(`Fila ${num}: monto "${fila.monto}" debe ser un número positivo`);
     }
     if (fila.fecha) {
-      const fecha = new Date(fila.fecha);
-      if (isNaN(fecha.getTime()))
+      if (parsearFecha(fila.fecha) === null)
         errores.push(`Fila ${num}: fecha "${fila.fecha}" inválida. Usar formato YYYY-MM-DD o DD/MM/YYYY`);
     }
     return errores;
