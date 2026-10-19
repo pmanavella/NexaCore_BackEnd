@@ -55,7 +55,7 @@ H-01 a H-47 surgen de la lectura del código (17 y 18/10/2026); los posteriores 
 
 | ID | Hallazgo | Casos |
 |---|---|---|
-| H-23 | `dias=0` se trata como 7; moneda y frecuencia inválidas se reemplazan en silencio; un pago se reconoce por coincidencias de texto | CP-FIN-08-06 |
+| H-23 | `dias=0` se trata como 7; moneda y frecuencia inválidas se reemplazan en silencio; un pago se reconoce por coincidencias de texto. Moneda y frecuencia inválidas confirmadas como DEF-016 (#34) por CP-FIN-07-01 a 07-04; corregido en 5e1d73d.| CP-FIN-08-06, CP-FIN-07-01 a 07-04 |
 
 ## Permisos
 

@@ -12,7 +12,7 @@ Se actualiza cada vez que se diseña un caso, se automatiza un test o se registr
 | REQ-FIN-04 | CP-FIN-04-01 a 04-15 | `test/finanzas.montos.test.js` (04-10 a 04-12), `test/finanzas.importacion.test.js` (04-01), `test/finanzas.excel-validacion.test.js` (04-03, 04-04), `test/finanzas.fechas.test.js` (04-13 a 04-15) | DEF-006 (#23), DEF-012 (#30), DEF-014 (#32), DEF-015 (#33) | Corregido, pendiente de merge y verificación |
 | REQ-FIN-05 | CP-FIN-05-01 a 05-16 | `test/finanzas.sueldos.test.js` (05-01 a 05-10, 05-13 a 05-16) | DEF-009 (#26), DEF-011 (#28) | Corregido, pendiente de merge y verificación |
 | REQ-FIN-06 | CP-FIN-06-01 a 06-17 | `test/finanzas.sueldos.test.js` (06-07 a 06-09, 06-11 a 06-17) | DEF-010 (#27) | Corregido, pendiente de merge y verificación |
-| REQ-FIN-07 | | | | Sin casos |
+| REQ-FIN-07 | CP-FIN-07-01 a 07-05 | `test/finanzas.suscripciones-validacion.test.js` (07-01 a 07-04); 07-05 cubierto por `test/finanzas.suscripciones.test.js` | DEF-016 (#34) | Corregido, pendiente de merge y verificación |
 | REQ-FIN-08 | CP-FIN-08-01 a 08-09 | `test/finanzas.suscripciones.test.js` (08-01 a 08-08) | — | Ejecutado sin defectos |
 | REQ-FIN-09 | CP-FIN-09-01 | `test/finanzas.comprobantes.test.js` | — | Ejecutado sin defectos |
 | REQ-FIN-10 | | | | Sin casos |
@@ -50,8 +50,9 @@ Antes de abrir un issue, tomar el siguiente número libre y anotarlo aquí.
 | DEF-013 | #31 | Se acepta una cotización del dólar no numérica (NaN) en lugar de usar la fuente siguiente | CP-FIN-13-09 | Media | 2026-10-19 | 2026-10-19 · `test/dolar-service` (frontend) | CP-FIN-13-09 |
 | DEF-014 | #32 | La importación por Excel rechaza fechas DD/MM/YYYY aunque la plantilla anuncia ese formato | CP-FIN-04-03 | Media | 2026-10-19 | 2026-10-19 · `fix/DEF-012-suscripcion-importacion` | CP-FIN-04-03 |
 | DEF-015 | #33 | La importación por Excel acepta fechas inexistentes (2026-02-31) | CP-FIN-04-04 | Media | 2026-10-19 | 2026-10-19 · `fix/DEF-015-fechas-inexistentes` (32668b8) | CP-FIN-04-04, 13, 14, 15 |
+| DEF-016 | #34 | Una moneda o frecuencia inválida en una suscripción se reemplaza en silencio por ARS o mensual | CP-FIN-07-01 a 07-04 | Media | 2026-10-19 | 2026-10-19 · `fix/DEF-016-suscripciones-moneda-frecuencia` (5e1d73d) | CP-FIN-07-01 a 07-04; 07-05 |
 
-Siguiente número libre: **DEF-016**.
+Siguiente número libre: **DEF-017**.
 
 ## Ejecuciones registradas
 
@@ -76,6 +77,9 @@ Siguiente número libre: **DEF-016**.
 | 2026-10-19 | `fix/DEF-015-fechas-inexistentes @ 32668b8` (`excel-validacion` / `fechas`) | 10 / 11 | 10 / 11 | 0 | EV-26b, EV-26d |
 | 2026-10-19 | `fix/DEF-015-fechas-inexistentes @ 32668b8`, suite completa | 824 | 661 | 163 | EV-26e |
 | 2026-10-19 | Integración local de todas las ramas de corrección y `test/cobertura-finanzas`, sin subir (antes de DEF-015) | 941 | 941 | 0 | Informe, sección 7.3 |
+| 2026-10-19 | `fix/DEF-016-suscripciones-moneda-frecuencia` (`finanzas.suscripciones-validacion.test.js`) | 4 | 0 → 4 | 4 → 0 | EV-27a, EV-27b |
+| 2026-10-19 | `fix/DEF-016-suscripciones-moneda-frecuencia`, tests de suscripciones de Victoria | 30 | 30 | 0 | EV-27c |
+| 2026-10-19 | `fix/DEF-016-suscripciones-moneda-frecuencia`, suite completa | 347 | 347 | 0 | EV-27d |
 
 Ninguna corrección produjo regresiones en la suite completa: cada una se comparó contra la rama de la que sale. Los 163 fallos de las ramas de la línea de importación son tests rojos de defectos corregidos en otras ramas todavía sin integrar: permisos (148), sueldos (6), movimientos (5) y `documentExtraction` (4, H-46).
 
@@ -93,6 +97,7 @@ Ninguna corrección produjo regresiones en la suite completa: cada una se compar
 | `fix/DEF-007-008-movimientos` | `test/casos-rojos` | DEF-007, 008 | Subida, sin merge |
 | `test/cobertura-finanzas` | `develop` | — (tests de cobertura) | Subida, sin merge |
 | `test/dolar-service` | `develop` del frontend | DEF-013 | Subida, sin merge |
+| `fix/DEF-016-suscripciones-moneda-frecuencia` | `develop` | DEF-016 | Subida, sin merge (independiente de las otras ramas) |
 
 **Integración propuesta**, cuando esté el pipeline de Valentina:
 1. ~~Mergear el pull request #29 a `develop`~~. Hecho el 18/10, sin revisión; falta la revisión de otra integrante.
