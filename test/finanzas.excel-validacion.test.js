@@ -139,3 +139,24 @@ test('importar: la base rechaza una tanda → error que indica el número de tan
   // Act y Assert
   await assert.rejects(excelService.importar(buffer, 'u@x'), /Error en lote 1: violación de restricción/);
 });
+
+test('CP-FIN-04-04 importar una fila con fecha inexistente 2026-02-31 → se rechaza con 400 y no se graba ninguna fila', async (t) => {
+  // Arrange
+  const insertados = [];
+  t.mock.method(supabase, 'from', () => ({
+    insert: (lote) => ({ select: async () => { insertados.push(...lote); return { data: lote.map((_, i) => ({ id: i })), error: null }; } }),
+  }));
+  const buffer = planilla([
+    ['2026-01-15', 'Hosting', 'Tecnología', 'Gasto', 1500],
+    ['2026-02-31', 'Fecha inexistente', 'Otros', 'Gasto', 100],
+    ['2026-03-10', 'Cobro cliente', 'Servicios', 'Ingreso', 2000],
+  ]);
+
+  // Act
+  const r = await excelService.importar(buffer, 'contable@nexacore.test').catch(e => e);
+
+  // Assert
+  const guardada = insertados.find(m => m.descripcion === 'Fecha inexistente')?.fecha;
+  assert.equal(r.status, 400, `fecha guardada: ${guardada}`);
+  assert.equal(insertados.length, 0);
+});
