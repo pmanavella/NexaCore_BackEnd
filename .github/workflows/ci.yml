@@ -90,6 +90,9 @@ jobs:
   calidad:
     name: Análisis estático y quality gate
     needs: pruebas
+    # El plan gratuito de SonarQube Cloud solo analiza la rama principal (develop):
+    # en un PR el gate aprobaba sin analizar código (EV-31). Se ejecuta solo en push.
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
