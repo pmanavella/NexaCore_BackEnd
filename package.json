@@ -10,7 +10,8 @@
     "start": "NODE_ENV=production node index.js",
     "dev": "cross-env NODE_ENV=development nodemon index.js",
     "test": "node --test",
-    "test:coverage": "node -e \"require('fs').mkdirSync('coverage',{recursive:true})\" && node --test --experimental-test-coverage --test-coverage-include=\"finance/**/*.js\" --test-coverage-exclude=\"finance/**/deudas*.js\" --test-coverage-exclude=\"finance/services/migradores/comprasInternacionales.js\" --test-coverage-exclude=\"finance/services/migradores/cuentasPorCobrar.js\" --test-coverage-exclude=\"finance/services/migradores/totalesFinancieros.js\" --test-coverage-exclude=\"finance/services/migradores/sueldosHistoricos.js\" --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info"
+    "test:coverage": "node -e \"require('fs').mkdirSync('coverage',{recursive:true})\" && node --test --experimental-test-coverage --test-coverage-include=\"finance/**/*.js\" --test-coverage-exclude=\"finance/**/deudas*.js\" --test-coverage-exclude=\"finance/services/migradores/comprasInternacionales.js\" --test-coverage-exclude=\"finance/services/migradores/cuentasPorCobrar.js\" --test-coverage-exclude=\"finance/services/migradores/totalesFinancieros.js\" --test-coverage-exclude=\"finance/services/migradores/sueldosHistoricos.js\" --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info",
+    "test:db:reset": "node scripts/test-db/seed.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
