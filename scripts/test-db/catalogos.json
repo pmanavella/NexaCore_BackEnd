@@ -1,0 +1,57 @@
+{
+  "_origen": "Exportado de la base Developer el 22/10/2026 (solo configuración, sin datos personales).",
+  "roles": [
+    { "nombre": "Auditor / Lector", "descripcion": "Solo visualización, sin permisos de edición", "nivel_jerarquico": "LOW", "activo": true },
+    { "nombre": "Comercial", "descripcion": "Acceso exclusivo al módulo CRM, sin acceso al dashboard", "nivel_jerarquico": "MEDIUM", "activo": true },
+    { "nombre": "Contable", "descripcion": "Acceso exclusivo al módulo financiero, sin acceso al dashboard", "nivel_jerarquico": "LOW", "activo": true },
+    { "nombre": "Dirección", "descripcion": "Acceso completo a todos los módulos del sistema", "nivel_jerarquico": "HIGH", "activo": true },
+    { "nombre": "Director", "descripcion": "LEGACY: reemplazado por \"Dirección\". Acceso completo a módulos principales", "nivel_jerarquico": "HIGH", "activo": false },
+    { "nombre": "Externo", "descripcion": "Acceso restringido por período definido", "nivel_jerarquico": "NONE", "activo": true },
+    { "nombre": "Mando Medio", "descripcion": "LEGACY: pendiente de reasignación funcional manual de sus usuarios. Gestión de su área y equipo directo", "nivel_jerarquico": "MEDIUM", "activo": false },
+    { "nombre": "Operario", "descripcion": "LEGACY: reemplazado por \"Operativo\". Acceso limitado a tareas asignadas", "nivel_jerarquico": "LOW", "activo": false },
+    { "nombre": "Operativo", "descripcion": "Acceso restringido únicamente al módulo operativo", "nivel_jerarquico": "LOW", "activo": true },
+    { "nombre": "Pasante", "descripcion": "Pasantes", "nivel_jerarquico": "LOW", "activo": true },
+    { "nombre": "Superadmin", "descripcion": "Administrador del sistema con acceso total y gestión exclusiva de usuarios", "nivel_jerarquico": "HIGH", "activo": true }
+  ],
+  "modulos": [
+    { "nombre": "crm", "label": "CRM", "descripcion": "Contactos, clientes, prospectos y proveedores" },
+    { "nombre": "dashboard", "label": "Panel General", "descripcion": "Tablero de comando con métricas generales" },
+    { "nombre": "finance", "label": "Módulo Financiero", "descripcion": "Movimientos, salarios, deudas y comprobantes" },
+    { "nombre": "indicadores", "label": "Indicadores", "descripcion": "Indicadores de gestión (KPI) calculados desde los movimientos financieros" },
+    { "nombre": "operations", "label": "Módulo Operativo", "descripcion": "Gestión de tareas y procesos internos del equipo" },
+    { "nombre": "organizacion", "label": "Organización", "descripcion": "Estructura organizacional, permisos y alcances por usuario" },
+    { "nombre": "planification", "label": "Planificación", "descripcion": "Proyectos, hitos y seguimiento de presupuesto" },
+    { "nombre": "protocolos", "label": "Protocolos", "descripcion": "Gestión de protocolos, checklists y pruebas de proyectos" },
+    { "nombre": "reportes", "label": "Reportes", "descripcion": "Reportes y análisis consolidados del sistema" },
+    { "nombre": "settings", "label": "Configuración", "descripcion": "Configuración general de la plataforma" },
+    { "nombre": "usuarios", "label": "Usuarios", "descripcion": "Gestión de usuarios del sistema y permisos" }
+  ],
+  "rol_modulo_permisos": [
+    ["Auditor / Lector", "crm", true, false], ["Auditor / Lector", "dashboard", true, false], ["Auditor / Lector", "finance", true, false],
+    ["Auditor / Lector", "operations", true, false], ["Auditor / Lector", "organizacion", true, false], ["Auditor / Lector", "planification", true, false],
+    ["Auditor / Lector", "reportes", true, false], ["Auditor / Lector", "settings", true, false], ["Auditor / Lector", "usuarios", true, false],
+    ["Comercial", "crm", true, true], ["Comercial", "dashboard", true, true],
+    ["Contable", "dashboard", true, true], ["Contable", "finance", true, true],
+    ["Dirección", "crm", true, true], ["Dirección", "dashboard", true, true], ["Dirección", "finance", true, true], ["Dirección", "indicadores", true, true],
+    ["Dirección", "operations", true, true], ["Dirección", "organizacion", true, true], ["Dirección", "planification", true, true],
+    ["Dirección", "reportes", true, true], ["Dirección", "settings", true, true], ["Dirección", "usuarios", true, true],
+    ["Director", "crm", true, true], ["Director", "dashboard", true, true], ["Director", "finance", true, true], ["Director", "operations", true, true],
+    ["Director", "organizacion", true, true], ["Director", "planification", true, true], ["Director", "reportes", true, true],
+    ["Director", "settings", true, true], ["Director", "usuarios", true, true],
+    ["Mando Medio", "crm", true, true], ["Mando Medio", "dashboard", true, true], ["Mando Medio", "operations", true, true], ["Mando Medio", "planification", true, true],
+    ["Operario", "dashboard", true, true], ["Operario", "operations", true, true],
+    ["Operativo", "operations", true, true],
+    ["Superadmin", "crm", true, true], ["Superadmin", "dashboard", true, true], ["Superadmin", "finance", true, true], ["Superadmin", "indicadores", true, true],
+    ["Superadmin", "operations", true, true], ["Superadmin", "organizacion", true, true], ["Superadmin", "planification", true, true],
+    ["Superadmin", "reportes", true, true], ["Superadmin", "settings", true, true], ["Superadmin", "usuarios", true, true]
+  ],
+  "categorias_salariales": [
+    { "nombre": "Aporte Patronal", "descripcion": "Contribución del empleador a cargas sociales y seguridad social" },
+    { "nombre": "Bono", "descripcion": "Bonificación por desempeño, objetivos o resultados" },
+    { "nombre": "Descuento", "descripcion": "Descuento aplicado al salario bruto (ausencias, adelantos, etc.)" },
+    { "nombre": "Horas Extra", "descripcion": "Pago por horas trabajadas fuera del horario habitual" },
+    { "nombre": "incentivo docente", "descripcion": "" },
+    { "nombre": "Otros", "descripcion": "Otros conceptos salariales no clasificados" },
+    { "nombre": "Sueldo Base", "descripcion": "Salario mensual base acordado con el empleado" }
+  ]
+}
