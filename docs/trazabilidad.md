@@ -52,7 +52,6 @@ Antes de abrir un issue, tomar el siguiente número libre y anotarlo aquí.
 | DEF-015 | #33   | La importación por Excel acepta fechas inexistentes (2026-02-31)                               | CP-FIN-04-04                             | Media     | 2026-10-19 | 2026-10-19 · `fix/DEF-015-fechas-inexistentes` (32668b8)             | CP-FIN-04-04, 13, 14, 15                |
 | DEF-016 | #34   | Una moneda o frecuencia inválida en una suscripción se reemplaza en silencio por ARS o mensual | CP-FIN-07-01 a 07-04                     | Media     | 2026-10-19 | 2026-10-19 · `fix/DEF-016-suscripciones-moneda-frecuencia` (5e1d73d) | CP-FIN-07-01 a 07-04; 07-05             |
 | DEF-017 | #35   | Con dias=0 la alerta de vencimientos devuelve los próximos 7 días en vez de solo los de hoy    | CP-FIN-08-06                             | Baja      | 2026-10-19 | —                                                                    | CP-FIN-08-06                            |
-| DEF-018 | #39   | La clave pública (anon) permite leer sueldos y asignarse permisos directamente en Supabase     | CP-FIN-16-09                             | Crítica   | 2026-10-22 | —                                                                    | CP-FIN-16-09                            |
 
 Siguiente número libre: **DEF-019**.
 
