@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Backend API para NexaCore — Sistema de gestión integral",
   "main": "index.js",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "NODE_ENV=production node index.js",
     "dev": "cross-env NODE_ENV=development nodemon index.js",

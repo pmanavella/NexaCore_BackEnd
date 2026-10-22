@@ -1,5 +1,10 @@
-node_modules/
+node_modules
 .env
+.env.*
+coverage
+.scannerwork
+.git
+.github
 *.log
 .DS_Store
 .claude/
