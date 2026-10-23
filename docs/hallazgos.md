@@ -1,6 +1,6 @@
 # Hallazgos de auditoría
 
-Surgen de la lectura del código (17/10/2026). **No son defectos**: cada uno se verifica con su caso de prueba y, si el caso falla, se registra como `DEF-NNN` en GitHub Issues. Los marcados como *inferido* no fueron ejecutados ni siquiera en la auditoría.
+H-01 a H-47 surgen de la lectura del código (17 y 18/10/2026); los posteriores indican en la descripción cuándo y cómo se detectaron. **No son defectos**: cada uno se verifica con su caso de prueba y, si el caso falla, se registra como `DEF-NNN` en GitHub Issues. Los marcados como *inferido* no fueron ejecutados ni siquiera en la auditoría.
 
 ## Alcance, estructura y entorno
 
@@ -15,6 +15,7 @@ Surgen de la lectura del código (17/10/2026). **No son defectos**: cada uno se 
 | H-07 | Solo 8 tests propios del módulo; el frontend no tiene tests y el CI no ejecuta pruebas | — |
 | H-08 | El backend declara Node 18, pero supabase-js requiere Node 20 o superior | Smoke tras actualizar |
 | H-09 | Sin análisis estático, linter ni cobertura; el frontend no tiene CI | — |
+| H-48 | `npm audit` informa 10 vulnerabilidades en dependencias del backend (1 crítica y 7 altas), entre ellas `xlsx`, que usa la importación por Excel. Riesgo de dependencias, no defecto del módulo. Detectado por Victoria (19/10) | — (se verifica con `npm audit`) |
 
 ## Validación de movimientos
 
@@ -29,12 +30,13 @@ Surgen de la lectura del código (17/10/2026). **No son defectos**: cada uno se 
 | ID | Hallazgo | Casos |
 |---|---|---|
 | H-13 | Endpoint Excel: un monto `0` numérico pasa la validación y aborta el lote; la inserción por lotes no es transaccional y deja importaciones parciales | CP-FIN-04-02, 04-06 |
-| H-14 | Endpoint Excel: valida la fecha con un parser distinto del que guarda; rechaza `31/12/2026` (formato de la plantilla) y deja pasar `2026-02-31` | CP-FIN-04-03, 04-04 |
+| H-14 | Endpoint Excel: valida la fecha con un parser distinto del que guarda; rechaza `31/12/2026` (formato de la plantilla) y deja pasar `2026-02-31`. Confirmado como DEF-014 (#32) y DEF-015 (#33); DEF-015 corregido en 32668b8 | CP-FIN-04-03, 04-04, 04-13 a 04-15 |
 | H-15 | Endpoint Excel: rechaza `" Gasto"` aunque al guardar recorta; un encabezado con acento no coincide; el detalle de errores no llega al cliente | CP-FIN-04-05, 04-09 |
 | H-16 | Migración: `"1.234,56"` se guarda como 1,23 y `"1,5"` como 15 | CP-FIN-03-01, 03-02 |
 | H-17 | Migración: la categoría se asigna por coincidencia parcial; el concepto `"a"` queda como Tecnología | CP-FIN-03-06 |
 | H-18 | Migración: confirmar y revertir exigen el rol `Admin`, que no existe; Dirección no puede hacerlo | CP-FIN-03-07 |
 | H-19 | Migración: revertir no es transaccional y borra registros aunque se hayan editado después | CP-FIN-03-08 |
+| H-49 | `parsearFecha`: el último recurso (`new Date`) acepta formatos que la plantilla no anuncia y convierte en silencio una fecha inexistente en otra válida (`2026/02/31` → 2026-03-03). Detectado al corregir DEF-015 (19/10); fuera de su alcance | — |
 
 ## Sueldos y cotización
 
@@ -43,13 +45,17 @@ Surgen de la lectura del código (17/10/2026). **No son defectos**: cada uno se 
 | H-20 | Se aceptan montos y cantidades negativos en movimientos salariales | CP-FIN-05-06, 05-07 |
 | H-21 | El backend no verifica la conversión a pesos: usa el `monto_ars` que envía el frontend y, si falta, guarda el monto en dólares como si fueran pesos | CP-FIN-06-07, 06-08 |
 | H-22 | Un tipo de salario o moneda inválidos se reemplazan en silencio; editar sin enviarlos vuelve el empleado a mensual en pesos y borra la cotización | CP-FIN-05-09, 05-10 |
+| H-34 | El campo de monto del formulario de sueldos solo admite dígitos y punto: `800.000` se guarda como 800 | CP-FIN-05-11, 05-12 |
+| H-35 | Al llegar la cotización, el formulario de sueldos reemplaza sin aviso el monto que el usuario ya escribió | CP-FIN-06-10 |
+| H-36 | En sueldos en dólares, si el usuario edita el monto, `monto_origen × cotización` deja de coincidir con `monto_ars`; ni el frontend ni el backend lo controlan | CP-FIN-06-07, 06-08 |
+| H-47 | Con la regla RN-03, un sueldo en dólares solo puede ajustarse en dólares, pero el formulario de edición del frontend solo envía el monto en pesos: el monto de un sueldo en dólares no puede modificarse desde la pantalla (sí la descripción y la fecha). Además, al editar un movimiento en dólares la cantidad de horas o turnos se ignora | Mejora del frontend pendiente |
 | H-24 | El backend no consulta ningún servicio de cotización: la consulta externa está en el frontend (`dolarService.js`); el POST guarda la cotización sin validar | Ver nota al final |
 
 ## Suscripciones
 
 | ID | Hallazgo | Casos |
 |---|---|---|
-| H-23 | `dias=0` se trata como 7; moneda y frecuencia inválidas se reemplazan en silencio; un pago se reconoce por coincidencias de texto | CP-FIN-08-06 |
+| H-23 | `dias=0` se trata como 7; moneda y frecuencia inválidas se reemplazan en silencio; un pago se reconoce por coincidencias de texto. Moneda y frecuencia inválidas confirmadas como DEF-016 (#34) por CP-FIN-07-01 a 07-04; corregido en 5e1d73d.| CP-FIN-08-06, CP-FIN-07-01 a 07-04 |
 
 ## Permisos
 
@@ -69,6 +75,26 @@ Surgen de la lectura del código (17/10/2026). **No son defectos**: cada uno se 
 | H-31 | En «Ver Movimientos» el filtro de categoría no tiene efecto y el selector no incluye Suscripción | — |
 | H-32 | La fecha inicial del formulario se calcula en UTC: después de las 21 h propone el día siguiente | — |
 | H-33 | El OCR sobrescribe fecha, categoría y tipo elegidos por el usuario; editar un sueldo desde Movimientos borra su cuenta contrapartida | — |
+
+## Indisponibilidad de Supabase (relevado el 18/10 para el plan de contingencia)
+
+| ID | Hallazgo | Casos |
+|---|---|---|
+| H-37 | `GET /api/health` siempre responde 200 sin consultar Supabase | CP-FIN-18-01 |
+| H-38 | Las fallas de Supabase llegan al cliente como HTTP 500 con el mensaje técnico o el HTML de la página de error; nunca 503. Con la base caída, un batch se informa como "no encontrado" (404) | CP-FIN-18-02, 18-03 |
+| H-39 | Si cae Supabase Auth, la autenticación responde 401 "Token inválido o expirado", igual que con un token inválido | CP-FIN-18-04 |
+| H-40 | Sin timeouts en el cliente de Supabase, en Express ni en el frontend: las peticiones pueden quedar colgadas varios minutos | CP-FIN-18-05 |
+| H-41 | Operaciones de varios pasos sin transacciones: archivos huérfanos, comprobantes procesados sin movimiento, batches trabados en "procesando" que no se pueden revertir, importaciones parciales; la limpieza nocturna puede dejar filas apuntando a archivos borrados | CP-FIN-18-06 a 18-08 |
+| H-42 | Ante un error, las pantallas de Finanzas muestran "No hay … registradas", sin aviso ni reintento; los mensajes de error son técnicos | CP-FIN-18-09, 18-10 |
+| H-43 | Una caída se informa en el inicio de sesión como "Email o contraseña incorrectos"; pueden quedar sesiones a medias | CP-FIN-18-11 |
+| H-44 | Logs solo en consola, sin ruta, usuario ni hora; los procesos programados no registran su resultado ni reintentan; no hay `HEALTHCHECK` | — |
+| H-45 | Al crear un gasto con una suscripción nueva, si falla el segundo paso la suscripción queda creada y reintentar la duplica | — |
+
+## Tests del equipo
+
+| ID | Hallazgo | Casos |
+|---|---|---|
+| H-46 | 4 de los 8 tests de `documentExtraction.test.js` fallaban en `develop` desde el commit `1f04ba4` (14/09), sin que nadie lo notara durante un mes porque los tests no se ejecutaban en ningún pipeline. No era un defecto del código: los tests quedaron desactualizados por dos cambios de regla intencionales (renglones netos contra subtotal; categoría inválida como advertencia). Se actualizaron con el pull request #29 (commit 85f7590), mergeado a develop el 18/10 (d443536), antes de la línea base (8 de 8 en verde). El merge se hizo sin la revisión de otra integrante que exige el plan de pruebas; la revisión queda pendiente | — |
 
 ## Nota sobre la cotización del dólar (H-24)
 

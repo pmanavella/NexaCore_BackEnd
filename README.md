@@ -4,7 +4,7 @@ API REST del sistema de gestión empresarial NexaCore, construida con Node.js y 
 
 ## Tecnologías
 
-- **Node.js** 18
+- **Node.js** 22
 - **Express**
 - **Supabase** (base de datos y autenticación)
 - **Docker**

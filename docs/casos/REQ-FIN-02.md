@@ -1,6 +1,6 @@
 # REQ-FIN-02 · Registrar gastos e ingresos con datos válidos
 
-**Riesgo:** R-03 (alto) · **Responsable del diseño:** Pilar · **Versión:** 1.0, 17/10/2026
+**Riesgo:** R-03 (alto) · **Responsable del diseño:** Pilar · **Versión:** 1.1, 18/10/2026
 
 **Precondiciones comunes:** usuario Contable con permiso manual nivel editor (U-10), nexacore-test con el seed cargado.
 **Pasos comunes:** 1. Enviar `POST /api/finance/movimientos` con los datos del caso. 2. Consultar la tabla `movimientos`.
@@ -38,5 +38,14 @@ El código no define un máximo; el límite es el de la columna `numeric(15,2)`:
 | CP-FIN-02-11 | monto `0.001` | Se rechaza (menor al mínimo representable) | HTTP 400, ningún registro nuevo | Media | I |
 | CP-FIN-02-12 | monto `9999999999999.99` | Se crea | HTTP 201 y monto guardado igual | Media | I |
 | CP-FIN-02-13 | monto `10000000000000` | Se rechaza por exceder el máximo | HTTP 400, ningún registro nuevo | Media | I |
+
+## Casos agregados durante la corrección (18/10/2026)
+
+| ID | Técnica | Datos de entrada | Resultado esperado | Criterio de aceptación | Prior. | Nivel |
+|---|---|---|---|---|---|---|
+| CP-FIN-02-14 | Equivalencia (inválida) | Editar un movimiento existente con fecha `2026-02-31` | Se rechaza | HTTP 400 y el movimiento no cambia | Alta | U |
+| CP-FIN-02-15 | Valor límite (residuos de cálculo) | Monto `0.30000000000000004`; variante con monto `1000.1` | Se aceptan y se guardan con 2 decimales | HTTP 201 y monto = 0.30 / 1000.10 | Alta | U |
+
+CP-FIN-02-15 protege contra una regresión que podía introducir la corrección de DEF-007: rechazar montos válidos por la forma en que la computadora representa los decimales.
 
 **Hallazgos relacionados:** 02-03 → H-01, H-02 · 02-06 → H-10 · 02-08 → H-12 · 02-11, 02-13 → H-11.
