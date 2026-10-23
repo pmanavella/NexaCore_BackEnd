@@ -1,6 +1,6 @@
 # Datos de prueba para nexacore-test
 
-**Para:** Valentina (seed y reinicio) · **Diseño:** Pilar · **Versión:** 1.1, 17/10/2026
+**Para:** Valentina (seed y reinicio) · **Diseño:** Pilar · **Versión:** 1.2, 23/10/2026
 
 Todos los datos son ficticios. Las descripciones empiezan con `TEST` para reconocerlas. Las fechas marcadas como *relativas* se calculan en el seed a partir de la fecha de ejecución (`CURRENT_DATE`), para que los casos de vencimientos funcionen cualquier día.
 
@@ -21,7 +21,7 @@ Un usuario activo por rol sin permisos manuales, uno inactivo y dos con permiso 
 | U-09 | Contable | **Inactivo** | 16-02 |
 | U-10 | Contable | Activo, **permiso manual nivel editor** | 16-06, 17-01, 02, 04 |
 | U-11 | Auditor / Lector | Activo, **permiso manual nivel lector** | 16-07, 16-08, 17-01 |
-| U-12 | Rol inexistente en la matriz del frontend | Activo, sin permiso | 16-10 |
+| U-12 | Mando Medio (rol legacy: existe en la base pero no en la matriz del frontend); correo `test.rol-legacy@nexacore.test` | Activo, sin permiso | 16-10 |
 
 ## 2. Empleados (tabla de decisión de sueldos)
 
@@ -63,7 +63,9 @@ Los empleados en dólares necesitan `cotizacion_tipo`, `cotizacion_valor`, `coti
 
 **Totales esperados del mes:** ingresos operativos 800.000 · egresos operativos 1.210.001,50 · egresos financieros 10.500 · total 2.020.501,50.
 
-Además, una fila por cada una de las siete categorías, tipo Gasto, en octubre de 2026, para las pruebas de listado.
+**Movimientos de octubre de 2026** (para las pruebas de listado): una fila por categoría, tipo Gasto, desde 2026-10-01 (una por día, en el orden RRHH, Insumos, Servicios, Otros, Suscripción, Tecnología, Inversión: hasta 2026-10-07), monto 1000, descripción `TEST Octubre <categoría>` y notas `listado-octubre`. Además, el gasto vinculado a S-05 se crea con la fecha del día del reinicio, así que octubre tiene 8 movimientos solo si el reinicio se corre en octubre.
+
+**Nota:** los casos de listado de octubre deben filtrar por `notas = 'listado-octubre'`, porque los casos de REQ-FIN-02 crean movimientos con fecha 2026-10-15.
 
 ## 4. Suscripciones (fechas relativas)
 
@@ -74,7 +76,7 @@ Además, una fila por cada una de las siete categorías, tipo Gasto, en octubre 
 | S-03 | Activa | Mensual | Hoy + 8 días | Fuera de la ventana |
 | S-04 | Activa | Mensual | Ayer | Ya venció en el mes |
 | S-05 | Activa | Mensual | Hoy + 3 días | Con un gasto vinculado por `suscripcion_id` en el período |
-| S-06 | Inactiva | Mensual | Hoy + 2 días | — |
+| S-06 | Pausada | Mensual | Hoy + 2 días | — |
 | S-07 | Activa | Mensual | 31 | Para el cálculo en meses cortos |
 | S-08 | Activa | Trimestral | Hoy + 5 días | — |
 
@@ -89,6 +91,8 @@ Si "hoy + N" cae en el mes siguiente, el seed ajusta el día igual que el sistem
 | B-01 | Batch de migración `completado` con 3 gastos | CP-FIN-03-08 |
 | B-02 | Batch `revertido` | CP-FIN-03-09 |
 | B-03 | Batch `procesando` | CP-FIN-03-10 |
+
+C-01 está vinculado al movimiento de octubre de la categoría Insumos.
 
 La variable `COMPANY_CUIT` del entorno de pruebas tiene que tener 11 dígitos, o todos los comprobantes quedan en revisión.
 
@@ -113,3 +117,10 @@ Van en `test/fixtures/`.
 | comprobantes/ | `factura.pdf`, `ticket.jpg`, `ticket.png` | Formatos válidos |
 | comprobantes/ | `firma-falsa.pdf` | Texto con extensión .pdf |
 | comprobantes/ | `10mb-mas-1.pdf` | Límite de tamaño |
+
+## Control de cambios
+
+| Versión | Fecha | Cambios |
+|---|---|---|
+| 1.0–1.1 | 17/10/2026 | Versiones anteriores, sin historial registrado |
+| 1.2 | 23/10/2026 | Alineado con el seed de nexacore-test: U-12 usa el rol legacy Mando Medio; S-06 pasa de Inactiva a Pausada (Inactiva no es un estado válido del esquema); se detallan los movimientos de octubre y el vínculo de C-01 |
