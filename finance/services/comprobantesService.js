@@ -130,7 +130,9 @@ class ComprobantesService {
     }
 
     try {
-      const movimiento = await movimientosService.crear(validation.movimiento, email);
+      // El total extraído puede traer más de 2 decimales; el movimiento se registra al centavo.
+      const monto = Math.round(validation.movimiento.monto * 100) / 100;
+      const movimiento = await movimientosService.crear({ ...validation.movimiento, monto }, email);
       const finalDiagnostico = { errors: [], warnings: validation.warnings, auto_created: true };
       const { data, error } = await supabase
         .from('comprobantes')
