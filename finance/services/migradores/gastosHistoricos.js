@@ -1,11 +1,12 @@
 const { parsearFecha, mapearCategoria, parseBuffer, toNumber, toMoney, CATEGORIAS_VALIDAS } = require('./migradorUtils');
+const { parsearMonto } = require('../../utils/montos');
 
 // Columnas esperadas (normalizadas): nombre, cantidad, concepto, descripcion, total, entregado
 // Destino: tabla movimientos (tipo=Gasto)
 
 function validarFila(fila, num) {
   const errores = [];
-  const monto = toMoney(fila.total);
+  const monto = parsearMonto(fila.total);
   if (monto === null)
     errores.push({ fila: num, campo: 'total', motivo: 'El campo "Total" es requerido y debe ser un número' });
   else if (monto <= 0)
@@ -25,7 +26,7 @@ function resolverCategoria(fila) {
 function mapearFila(fila, num, fecha) {
   const descripcion = String(fila.descripcion || fila.concepto || fila.nombre || '').trim() || 'Sin descripción';
   const categoria = resolverCategoria(fila);
-  const monto = toMoney(fila.total);
+  const monto = parsearMonto(fila.total);
 
   const notasParts = [];
   if (fila.cantidad != null) notasParts.push(`Cantidad: ${fila.cantidad}`);
