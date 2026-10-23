@@ -2,36 +2,35 @@ const express = require('express')
 const router = express.Router()
 const ctrl = require('../controllers/salariosController')
 const { authenticate } = require('../../middleware/authMiddleware')
-const { requireRole, requireModuleAccess } = require('../../middleware/rbacMiddleware')
-
-const soloAdmin = requireRole('Dirección', 'Superadmin')
+const { consultaFinanzas, cargaFinanzas, soloMandoAlto } = require('../config/permisos')
 
 router.use(authenticate)
 
-// Métricas — mantiene además el check de rol existente (soloAdmin) por tratarse de datos
-// sensibles de nómina, sumado al chequeo de acceso real al módulo Finanzas.
-router.get('/metricas', soloAdmin, requireModuleAccess('finance', 'Finanzas'), ctrl.metricas.bind(ctrl))
+// Sueldos (todo salarios/* salvo la cotización): solo mando alto, sin importar el permiso manual
 
-// Cotización del dólar
-router.get('/cotizacion-dolar',  soloAdmin, ctrl.getCotizacionDiaria.bind(ctrl))
-router.post('/cotizacion-dolar', soloAdmin, ctrl.guardarCotizacion.bind(ctrl))
+// Métricas de nómina
+router.get('/metricas', soloMandoAlto, ctrl.metricas.bind(ctrl))
+
+// Cotización del dólar — es parte de Finanzas, no de Sueldos
+router.get('/cotizacion-dolar',  consultaFinanzas, ctrl.getCotizacionDiaria.bind(ctrl))
+router.post('/cotizacion-dolar', cargaFinanzas, ctrl.guardarCotizacion.bind(ctrl))
 
 // Empleados
-router.get('/empleados',        soloAdmin, ctrl.listarEmpleados.bind(ctrl))
-router.get('/empleados/:id',    soloAdmin, ctrl.obtenerEmpleado.bind(ctrl))
-router.post('/empleados',       soloAdmin, ctrl.crearEmpleado.bind(ctrl))
-router.put('/empleados/:id',    soloAdmin, ctrl.actualizarEmpleado.bind(ctrl))
-router.delete('/empleados/:id', soloAdmin, ctrl.eliminarEmpleado.bind(ctrl))
+router.get('/empleados',        soloMandoAlto, ctrl.listarEmpleados.bind(ctrl))
+router.get('/empleados/:id',    soloMandoAlto, ctrl.obtenerEmpleado.bind(ctrl))
+router.post('/empleados',       soloMandoAlto, ctrl.crearEmpleado.bind(ctrl))
+router.put('/empleados/:id',    soloMandoAlto, ctrl.actualizarEmpleado.bind(ctrl))
+router.delete('/empleados/:id', soloMandoAlto, ctrl.eliminarEmpleado.bind(ctrl))
 
 // Categorías
-router.get('/categorias',        soloAdmin, ctrl.listarCategorias.bind(ctrl))
-router.post('/categorias',       soloAdmin, ctrl.crearCategoria.bind(ctrl))
-router.delete('/categorias/:id', soloAdmin, ctrl.eliminarCategoria.bind(ctrl))
+router.get('/categorias',        soloMandoAlto, ctrl.listarCategorias.bind(ctrl))
+router.post('/categorias',       soloMandoAlto, ctrl.crearCategoria.bind(ctrl))
+router.delete('/categorias/:id', soloMandoAlto, ctrl.eliminarCategoria.bind(ctrl))
 
 // Movimientos salariales
-router.get('/movimientos',        soloAdmin, ctrl.listarMovimientos.bind(ctrl))
-router.post('/movimientos',       soloAdmin, ctrl.crearMovimiento.bind(ctrl))
-router.put('/movimientos/:id',    soloAdmin, ctrl.actualizarMovimiento.bind(ctrl))
-router.delete('/movimientos/:id', soloAdmin, ctrl.eliminarMovimiento.bind(ctrl))
+router.get('/movimientos',        soloMandoAlto, ctrl.listarMovimientos.bind(ctrl))
+router.post('/movimientos',       soloMandoAlto, ctrl.crearMovimiento.bind(ctrl))
+router.put('/movimientos/:id',    soloMandoAlto, ctrl.actualizarMovimiento.bind(ctrl))
+router.delete('/movimientos/:id', soloMandoAlto, ctrl.eliminarMovimiento.bind(ctrl))
 
 module.exports = router

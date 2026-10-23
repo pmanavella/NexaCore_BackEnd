@@ -54,8 +54,11 @@ class SuscripcionesService {
 
   async crear(body, email = null) {
     const { nombre, detalle, proveedor, monto, moneda, dia_vencimiento, frecuencia, estado } = body;
-    const monedaFinal = MONEDAS_VALIDAS.includes(moneda) ? moneda : 'ARS';
-    const frecuenciaFinal = FRECUENCIAS_VALIDAS.includes(frecuencia) ? frecuencia : 'mensual';
+
+    // DEF-016: el valor por defecto solo se aplica si el campo no se envió;
+    // un valor inválido lo rechaza _validar (antes se reemplazaba en silencio).
+    const monedaFinal     = moneda     ?? 'ARS';
+    const frecuenciaFinal = frecuencia ?? 'mensual';
     this._validar({ nombre, monto, moneda: monedaFinal, dia_vencimiento, estado, frecuencia: frecuenciaFinal });
 
     const { data, error } = await supabase
@@ -79,8 +82,11 @@ class SuscripcionesService {
 
   async actualizar(id, body, email = null) {
     const { nombre, detalle, proveedor, monto, moneda, dia_vencimiento, frecuencia, estado } = body;
-    const monedaFinal    = MONEDAS_VALIDAS.includes(moneda) ? moneda : 'ARS';
-    const frecuenciaFinal = FRECUENCIAS_VALIDAS.includes(frecuencia) ? frecuencia : 'mensual';
+
+    // DEF-016: el valor por defecto solo se aplica si el campo no se envió;
+    // un valor inválido lo rechaza _validar (antes se reemplazaba en silencio).
+    const monedaFinal     = moneda     ?? 'ARS';
+    const frecuenciaFinal = frecuencia ?? 'mensual';
     this._validar({ nombre, monto, moneda: monedaFinal, dia_vencimiento, estado, frecuencia: frecuenciaFinal });
 
     const { data, error } = await supabase

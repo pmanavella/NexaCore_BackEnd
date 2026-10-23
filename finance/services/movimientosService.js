@@ -14,6 +14,56 @@ async function adjuntarUrlsFirmadas(movimientos) {
   }));
 }
 
+// Máximo de la columna movimientos.monto (numeric(15,2)).
+const MONTO_MAXIMO = 9999999999999.99;
+
+const errorValidacion = (mensaje) => Object.assign(new Error(mensaje), { status: 400 });
+
+// Faltante = ausente, null o texto vacío. El número 0 no es un campo faltante.
+const faltante = (valor) => valor === undefined || valor === null || (typeof valor === 'string' && !valor.trim());
+
+// Devuelve el monto redondeado a 2 decimales, que es el que se guarda.
+function validarMonto(monto) {
+  const numero = typeof monto === 'number' ? monto
+    : typeof monto === 'string' && monto.trim() ? Number(monto) : NaN;
+  if (!Number.isFinite(numero))
+    throw errorValidacion('El monto debe ser un número válido');
+  if (numero <= 0)
+    throw errorValidacion('El monto debe ser mayor a 0');
+  const redondeado = Math.round(numero * 100) / 100;
+  // Tolerancia de unos pocos ULP: acepta residuos de punto flotante
+  // (0.30000000000000004) pero no decimales reales de más (0.001, 1.005).
+  if (Math.abs(numero - redondeado) > numero * Number.EPSILON * 4)
+    throw errorValidacion('El monto puede tener como máximo 2 decimales');
+  if (redondeado > MONTO_MAXIMO)
+    throw errorValidacion(`El monto no puede superar ${MONTO_MAXIMO}`);
+  return redondeado;
+}
+
+// AAAA-MM-DD y que exista en el calendario (2026-02-31 no es válida).
+function validarFecha(fecha) {
+  const partes = typeof fecha === 'string' && /^(\d{4})-(\d{2})-(\d{2})$/.exec(fecha);
+  if (partes) {
+    const [, anio, mes, dia] = partes.map(Number);
+    const d = new Date(Date.UTC(anio, mes - 1, dia));
+    if (d.getUTCFullYear() === anio && d.getUTCMonth() === mes - 1 && d.getUTCDate() === dia) return;
+  }
+  throw errorValidacion('La fecha debe tener formato AAAA-MM-DD y ser una fecha existente');
+}
+
+// Devuelve los valores normalizados para guardar.
+function validarMovimiento({ fecha, descripcion, categoria, tipo, monto }) {
+  if ([fecha, descripcion, categoria, tipo, monto].some(faltante))
+    throw errorValidacion('Faltan campos obligatorios: fecha, descripcion, categoria, tipo, monto');
+  if (!TIPOS_VALIDOS.includes(tipo))
+    throw errorValidacion('Tipo debe ser Ingreso o Gasto');
+  if (!CATEGORIAS_VALIDAS.includes(categoria))
+    throw errorValidacion(`Categoría inválida. Opciones: ${CATEGORIAS_VALIDAS.join(', ')}`);
+  const montoNormalizado = validarMonto(monto);
+  validarFecha(fecha);
+  return { monto: montoNormalizado };
+}
+
 class MovimientosService {
   async listar({ tipo, categoria, fecha_desde, fecha_hasta, search } = {}) {
     let query = supabase
@@ -131,16 +181,9 @@ class MovimientosService {
   }
 
   async crear(body, email = null) {
-    const { fecha, descripcion, categoria, tipo, monto, proveedor_cliente, notas, cuenta_contrapartida, suscripcion_id } = body;
+    const { fecha, descripcion, categoria, tipo, proveedor_cliente, notas, cuenta_contrapartida, suscripcion_id } = body;
 
-    if (!fecha || !String(descripcion || '').trim() || !categoria || !tipo || !monto)
-      throw Object.assign(new Error('Faltan campos obligatorios: fecha, descripcion, categoria, tipo, monto'), { status: 400 });
-    if (!TIPOS_VALIDOS.includes(tipo))
-      throw Object.assign(new Error('Tipo debe ser Ingreso o Gasto'), { status: 400 });
-    if (!CATEGORIAS_VALIDAS.includes(categoria))
-      throw Object.assign(new Error(`Categoría inválida. Opciones: ${CATEGORIAS_VALIDAS.join(', ')}`), { status: 400 });
-    if (Number(monto) <= 0)
-      throw Object.assign(new Error('El monto debe ser mayor a 0'), { status: 400 });
+    const { monto } = validarMovimiento(body);
 
     const { data, error } = await supabase
       .from('movimientos')
@@ -149,7 +192,7 @@ class MovimientosService {
         descripcion: String(descripcion).trim(),
         categoria,
         tipo,
-        monto: Number(monto),
+        monto,
         proveedor_cliente: proveedor_cliente ? String(proveedor_cliente).trim() : null,
         notas: notas ? String(notas).trim() : null,
         cuenta_contrapartida: cuenta_contrapartida || null,
@@ -163,16 +206,9 @@ class MovimientosService {
   }
 
   async actualizar(id, body, email = null) {
-    const { fecha, descripcion, categoria, tipo, monto, proveedor_cliente, notas, cuenta_contrapartida, suscripcion_id } = body;
+    const { fecha, descripcion, categoria, tipo, proveedor_cliente, notas, cuenta_contrapartida, suscripcion_id } = body;
 
-    if (!fecha || !String(descripcion || '').trim() || !categoria || !tipo || !monto)
-      throw Object.assign(new Error('Faltan campos obligatorios: fecha, descripcion, categoria, tipo, monto'), { status: 400 });
-    if (!TIPOS_VALIDOS.includes(tipo))
-      throw Object.assign(new Error('Tipo debe ser Ingreso o Gasto'), { status: 400 });
-    if (!CATEGORIAS_VALIDAS.includes(categoria))
-      throw Object.assign(new Error(`Categoría inválida. Opciones: ${CATEGORIAS_VALIDAS.join(', ')}`), { status: 400 });
-    if (Number(monto) <= 0)
-      throw Object.assign(new Error('El monto debe ser mayor a 0'), { status: 400 });
+    const { monto } = validarMovimiento(body);
 
     const { data, error } = await supabase
       .from('movimientos')
@@ -181,7 +217,7 @@ class MovimientosService {
         descripcion: String(descripcion).trim(),
         categoria,
         tipo,
-        monto: Number(monto),
+        monto,
         proveedor_cliente: proveedor_cliente ? String(proveedor_cliente).trim() : null,
         notas: notas ? String(notas).trim() : null,
         cuenta_contrapartida: cuenta_contrapartida || null,

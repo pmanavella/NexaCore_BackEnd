@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 
-const CATEGORIAS_VALIDAS = ['Tecnología', 'RRHH', 'Insumos', 'Servicios', 'Inversión', 'Otros', 'Suscripción'];
+const { CATEGORIAS_VALIDAS } = require('../config/movimientos');
 const TIPOS_DOCUMENTO_VALIDOS = ['factura_a', 'factura_b', 'factura_c', 'ticket'];
 const MIMES_PERMITIDOS = ['image/jpeg', 'image/png', 'application/pdf'];
 
