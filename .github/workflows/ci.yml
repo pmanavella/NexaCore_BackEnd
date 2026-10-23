@@ -118,3 +118,47 @@ jobs:
           npx --yes @sonar/scan@4.4.0
           -Dsonar.projectVersion=post-linea-base
           -Dsonar.qualitygate.wait=true
+
+  integracion:
+    name: Integración con Supabase (nexacore-test)
+    needs: pruebas
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Solo la base de pruebas nexacore-test; las credenciales son secretos del repositorio.
+      SUPABASE_TEST_URL: ${{ secrets.SUPABASE_TEST_URL }}
+      SUPABASE_TEST_ANON_KEY: ${{ secrets.SUPABASE_TEST_ANON_KEY }}
+      SUPABASE_TEST_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_TEST_SERVICE_ROLE_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Pruebas de integración contra nexacore-test
+        shell: bash
+        run: npm run test:integracion 2>&1 | tee resultado-integracion.txt
+
+      - name: Reporte en el resumen de la ejecución
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Integración con Supabase (nexacore-test)"
+            echo '```'
+            grep -E '^ℹ (tests|pass|fail|skipped)' resultado-integracion.txt || true
+            echo '```'
+            if grep -q '^✖' resultado-integracion.txt; then
+              echo "### Pruebas fallidas"
+              echo '```'
+              grep -E '^✖' resultado-integracion.txt | sort -u || true
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
