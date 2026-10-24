@@ -10,6 +10,10 @@ COPY . .
 
 ENV NODE_ENV=production
 
+# Versión desplegada (commit), la informa GET /api/health para verificar cada instancia.
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
+
 EXPOSE 3001
 
 CMD ["node", "index.js"]
