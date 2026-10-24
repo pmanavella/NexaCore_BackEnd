@@ -130,8 +130,14 @@ test('chat: llamadas a herramientas truncadas no se ejecutan', async (t) => {
 // ── 4. Timeout global ───────────────────────────────────────────────────────
 
 test('plazo: carrera corta una promesa colgada y verificar falla al vencer', async () => {
-  const plazo = crearPlazo(20);
-  await assert.rejects(() => plazo.carrera(new Promise(() => {})), err => err.codigo === 'NEXI_TIMEOUT' && err.status === 504 && err.publico);
+  // Reloj controlado: con Date.now() real, setTimeout puede dispararse
+  // un instante antes de que el reloj llegue al vencimiento, y verificar()
+  // fallaba en ~15 % de las ejecuciones (prueba no determinista).
+  let ahora = 1000;
+  const plazo = crearPlazo(20, () => ahora);
+  const corte = assert.rejects(() => plazo.carrera(new Promise(() => {})), err => err.codigo === 'NEXI_TIMEOUT' && err.status === 504 && err.publico);
+  ahora += 20;
+  await corte;
   assert.throws(() => plazo.verificar(), err => err.codigo === 'NEXI_TIMEOUT');
 });
 

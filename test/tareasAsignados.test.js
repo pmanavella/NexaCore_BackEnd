@@ -9,6 +9,11 @@ const supabase = require('../config/supabase');
 const operationsService = require('../operations/services/operationsService');
 const nexiDatos = require('../nexi/services/nexiDatos');
 
+// Tablero y usuario de la sesión: mando alto (ve todos los tableros); Ana, Beto
+// y Caro son miembros del tablero (ver preparar).
+const TABLERO = randomUUID();
+const ADMIN = { id: randomUUID(), name: 'Admin', hierarchyLevel: 'HIGH' };
+
 // ── Supabase en memoria ──────────────────────────────────────────────────────
 // Implementa solo lo que usan operationsService / tareaAsignados: filtros eq/in/or
 // (tipo), embeds de operativo_etapas y tarea_asignados(usuarios), insert/update/
@@ -17,6 +22,7 @@ const nexiDatos = require('../nexi/services/nexiDatos');
 function crearBase() {
   const db = {
     usuarios: [], tareas: [], tarea_asignados: [], tarea_historial: [],
+    operativo_tableros: [{ id: TABLERO, nombre: 'General' }], operativo_tablero_miembros: [],
     operativo_etapas: [{ id: 'etapa-1', nombre: 'Pendiente', color: '#000000', tipo_base: 'pendiente', posicion: 0 }],
   };
   const usuario = (nombre, estado = 'Activo') => {
@@ -107,6 +113,7 @@ function preparar(t) {
   t.mock.method(supabase, 'from', base.from);
   t.mock.method(supabase, 'rpc', base.rpc);
   const A = base.usuario('Ana'), B = base.usuario('Beto'), C = base.usuario('Caro');
+  for (const u of [A, B, C]) base.db.operativo_tablero_miembros.push({ tablero_id: TABLERO, usuario_id: u.id });
   return { ...base, A, B, C };
 }
 
@@ -116,7 +123,7 @@ const nombres = (tarea) => tarea.asignados.map(a => a.nombre);
 
 test('A) crear tarea con una persona', async (t) => {
   const { A } = preparar(t);
-  const tarea = await operationsService.crearTarea({ titulo: 'T', asignados: [A.id] });
+  const tarea = await operationsService.crearTarea({ tablero_id: TABLERO, titulo: 'T', asignados: [A.id] }, ADMIN);
   assert.deepEqual(tarea.asignados, [{ id: A.id, nombre: 'Ana', email: 'ana@x.com', estado: 'Activo' }]);
   assert.equal(tarea.asignado_a, 'Ana'); // compatibilidad: igual que antes con un responsable
   assert.equal(tarea.tarea_asignados, undefined);
@@ -124,17 +131,17 @@ test('A) crear tarea con una persona', async (t) => {
 
 test('B/C) crear tarea con dos y tres personas (respeta el orden enviado)', async (t) => {
   const { A, B, C } = preparar(t);
-  const dos = await operationsService.crearTarea({ titulo: 'T2', asignados: [B.id, A.id] });
+  const dos = await operationsService.crearTarea({ tablero_id: TABLERO, titulo: 'T2', asignados: [B.id, A.id] }, ADMIN);
   assert.deepEqual(nombres(dos), ['Beto', 'Ana']);
   assert.equal(dos.asignado_a, 'Beto, Ana');
-  const tres = await operationsService.crearTarea({ titulo: 'T3', asignados: [A.id, B.id, C.id] });
+  const tres = await operationsService.crearTarea({ tablero_id: TABLERO, titulo: 'T3', asignados: [A.id, B.id, C.id] }, ADMIN);
   assert.deepEqual(nombres(tres), ['Ana', 'Beto', 'Caro']);
 });
 
 test('D) crear con [A, A] → 400 y no crea la tarea', async (t) => {
   const { A, db } = preparar(t);
   await assert.rejects(
-    operationsService.crearTarea({ titulo: 'T', asignados: [A.id, A.id] }),
+    operationsService.crearTarea({ tablero_id: TABLERO, titulo: 'T', asignados: [A.id, A.id] }, ADMIN),
     (err) => err.status === 400 && /dos veces/.test(err.message)
   );
   assert.equal(db.tareas.length, 0);
@@ -144,21 +151,21 @@ test('crear: validaciones de asignados (no array, id inválido, inexistente, ina
   const { usuario, db } = preparar(t);
   const inactivo = usuario('Ivo', 'Inactivo');
   for (const asignados of ['abc', ['no-uuid'], [randomUUID()], [inactivo.id]]) {
-    await assert.rejects(operationsService.crearTarea({ titulo: 'T', asignados }), (err) => err.status === 400, JSON.stringify(asignados));
+    await assert.rejects(operationsService.crearTarea({ tablero_id: TABLERO, titulo: 'T', asignados }, ADMIN), (err) => err.status === 400, JSON.stringify(asignados));
   }
   assert.equal(db.tareas.length, 0);
 });
 
 test('crear sin asignados: tarea sin personas (el campo sigue siendo opcional)', async (t) => {
   preparar(t);
-  const tarea = await operationsService.crearTarea({ titulo: 'T' });
+  const tarea = await operationsService.crearTarea({ tablero_id: TABLERO, titulo: 'T' }, ADMIN);
   assert.deepEqual(tarea.asignados, []);
   assert.equal(tarea.asignado_a, null);
 });
 
 test('crear con asignado_a legacy (nombre único) → vincula al usuario', async (t) => {
   const { A } = preparar(t);
-  const tarea = await operationsService.crearTarea({ titulo: 'T', asignado_a: 'Ana' });
+  const tarea = await operationsService.crearTarea({ tablero_id: TABLERO, titulo: 'T', asignado_a: 'Ana' }, ADMIN);
   assert.deepEqual(tarea.asignados.map(a => a.id), [A.id]);
 });
 
@@ -166,13 +173,13 @@ test('crear con asignado_a legacy (nombre único) → vincula al usuario', async
 
 test('E/F/G) editar [A] → [A,B] → [B] → [B,C] con historial', async (t) => {
   const { A, B, C, db } = preparar(t);
-  const { id } = await operationsService.crearTarea({ titulo: 'T', asignados: [A.id] });
+  const { id } = await operationsService.crearTarea({ tablero_id: TABLERO, titulo: 'T', asignados: [A.id] }, ADMIN);
 
-  let tarea = await operationsService.actualizarTarea(id, { asignados: [A.id, B.id], usuario_nombre: 'Admin' });
+  let tarea = await operationsService.actualizarTarea(id, { asignados: [A.id, B.id], usuario_nombre: 'Admin' }, ADMIN);
   assert.deepEqual(nombres(tarea), ['Ana', 'Beto']);
-  tarea = await operationsService.actualizarTarea(id, { asignados: [B.id] });
+  tarea = await operationsService.actualizarTarea(id, { asignados: [B.id] }, ADMIN);
   assert.deepEqual(nombres(tarea), ['Beto']);
-  tarea = await operationsService.actualizarTarea(id, { asignados: [B.id, C.id] });
+  tarea = await operationsService.actualizarTarea(id, { asignados: [B.id, C.id] }, ADMIN);
   assert.deepEqual(nombres(tarea), ['Beto', 'Caro']);
   assert.equal(db.tarea_asignados.filter(a => a.tarea_id === id).length, 2);
 
@@ -182,63 +189,63 @@ test('E/F/G) editar [A] → [A,B] → [B] → [B,C] con historial', async (t) =>
 
 test('editar con duplicados → 400 y no cambia nada', async (t) => {
   const { A, B } = preparar(t);
-  const { id } = await operationsService.crearTarea({ titulo: 'T', asignados: [A.id] });
-  await assert.rejects(operationsService.actualizarTarea(id, { asignados: [B.id, B.id], titulo: 'Otro' }), (err) => err.status === 400);
-  const [tarea] = (await operationsService.listarTareas()).data;
+  const { id } = await operationsService.crearTarea({ tablero_id: TABLERO, titulo: 'T', asignados: [A.id] }, ADMIN);
+  await assert.rejects(operationsService.actualizarTarea(id, { asignados: [B.id, B.id], titulo: 'Otro' }, ADMIN), (err) => err.status === 400);
+  const [tarea] = (await operationsService.listarTareas({ tablero_id: TABLERO }, ADMIN)).data;
   assert.equal(tarea.titulo, 'T');
   assert.deepEqual(nombres(tarea), ['Ana']);
 });
 
 test('editar sin `asignados` no toca la asignación; reenviar el asignado_a actual tampoco', async (t) => {
   const { A, B } = preparar(t);
-  const { id } = await operationsService.crearTarea({ titulo: 'T', asignados: [A.id, B.id] });
-  let tarea = await operationsService.actualizarTarea(id, { titulo: 'Nuevo' });
+  const { id } = await operationsService.crearTarea({ tablero_id: TABLERO, titulo: 'T', asignados: [A.id, B.id] }, ADMIN);
+  let tarea = await operationsService.actualizarTarea(id, { titulo: 'Nuevo' }, ADMIN);
   assert.deepEqual(nombres(tarea), ['Ana', 'Beto']);
   // Cliente viejo que reenvía el formulario con el texto que recibió
-  tarea = await operationsService.actualizarTarea(id, { titulo: 'Otro', asignado_a: 'Ana, Beto' });
+  tarea = await operationsService.actualizarTarea(id, { titulo: 'Otro', asignado_a: 'Ana, Beto' }, ADMIN);
   assert.deepEqual(nombres(tarea), ['Ana', 'Beto']);
 });
 
 test('editar: un asignado ya inactivo puede mantenerse, pero no agregarse', async (t) => {
   const { A, B, db } = preparar(t);
-  const { id } = await operationsService.crearTarea({ titulo: 'T', asignados: [A.id] });
+  const { id } = await operationsService.crearTarea({ tablero_id: TABLERO, titulo: 'T', asignados: [A.id] }, ADMIN);
   db.usuarios.find(u => u.id === A.id).estado = 'Inactivo';
-  const tarea = await operationsService.actualizarTarea(id, { asignados: [A.id, B.id] });
+  const tarea = await operationsService.actualizarTarea(id, { asignados: [A.id, B.id] }, ADMIN);
   assert.deepEqual(nombres(tarea), ['Ana', 'Beto']);
-  const otra = await operationsService.crearTarea({ titulo: 'T2' });
-  await assert.rejects(operationsService.actualizarTarea(otra.id, { asignados: [A.id] }), (err) => err.status === 400);
+  const otra = await operationsService.crearTarea({ tablero_id: TABLERO, titulo: 'T2' }, ADMIN);
+  await assert.rejects(operationsService.actualizarTarea(otra.id, { asignados: [A.id] }, ADMIN), (err) => err.status === 400);
 });
 
 // ── Listado y filtros ────────────────────────────────────────────────────────
 
 test('H/I) listar devuelve todos los asignados; filtrar por persona incluye tareas compartidas', async (t) => {
   const { A, B, C } = preparar(t);
-  await operationsService.crearTarea({ titulo: 'solo-ana', asignados: [A.id] });
-  await operationsService.crearTarea({ titulo: 'compartida', asignados: [A.id, B.id] });
-  await operationsService.crearTarea({ titulo: 'solo-caro', asignados: [C.id] });
+  await operationsService.crearTarea({ tablero_id: TABLERO, titulo: 'solo-ana', asignados: [A.id] }, ADMIN);
+  await operationsService.crearTarea({ tablero_id: TABLERO, titulo: 'compartida', asignados: [A.id, B.id] }, ADMIN);
+  await operationsService.crearTarea({ tablero_id: TABLERO, titulo: 'solo-caro', asignados: [C.id] }, ADMIN);
 
-  const todas = await operationsService.listarTareas();
+  const todas = await operationsService.listarTareas({ tablero_id: TABLERO }, ADMIN);
   assert.deepEqual(nombres(todas.data.find(x => x.titulo === 'compartida')), ['Ana', 'Beto']);
 
-  const porId = await operationsService.listarTareas({ asignado_id: B.id });
+  const porId = await operationsService.listarTareas({ tablero_id: TABLERO, asignado_id: B.id }, ADMIN);
   assert.deepEqual(porId.data.map(x => x.titulo), ['compartida']);
 
   // Filtro legacy por nombre: también encuentra la compartida (antes eq exacto la perdía)
-  const porNombre = await operationsService.listarTareas({ asignado_a: 'Ana' });
+  const porNombre = await operationsService.listarTareas({ tablero_id: TABLERO, asignado_a: 'Ana' }, ADMIN);
   assert.deepEqual(porNombre.data.map(x => x.titulo).sort(), ['compartida', 'solo-ana']);
 
-  const nadie = await operationsService.listarTareas({ asignado_a: 'Nadie' });
+  const nadie = await operationsService.listarTareas({ tablero_id: TABLERO, asignado_a: 'Nadie' }, ADMIN);
   assert.deepEqual(nadie, { data: [], total: 0 });
 });
 
 test('J) tarea histórica: vinculada por la migración se devuelve como asignados: [persona]; sin vincular conserva su texto', async (t) => {
   const { A, db } = preparar(t);
   // Estado tal como lo deja la migración
-  db.tareas.push({ id: 'hist-1', titulo: 'vieja', tipo: 'asignacion', asignado_a: 'Ana', etapa_id: 'etapa-1' });
+  db.tareas.push({ id: 'hist-1', titulo: 'vieja', tipo: 'asignacion', asignado_a: 'Ana', etapa_id: 'etapa-1', tablero_id: TABLERO });
   db.tarea_asignados.push({ id: 'r1', tarea_id: 'hist-1', usuario_id: A.id, orden: 1 });
-  db.tareas.push({ id: 'hist-2', titulo: 'externa', tipo: 'asignacion', asignado_a: 'Fantasma', etapa_id: 'etapa-1' });
+  db.tareas.push({ id: 'hist-2', titulo: 'externa', tipo: 'asignacion', asignado_a: 'Fantasma', etapa_id: 'etapa-1', tablero_id: TABLERO });
 
-  const { data } = await operationsService.listarTareas();
+  const { data } = await operationsService.listarTareas({ tablero_id: TABLERO }, ADMIN);
   const vieja = data.find(x => x.id === 'hist-1');
   assert.deepEqual(vieja.asignados.map(a => a.id), [A.id]);
   assert.equal(vieja.asignado_a, 'Ana');
@@ -248,18 +255,18 @@ test('J) tarea histórica: vinculada por la migración se devuelve como asignado
   assert.equal(externa.asignado_a, 'Fantasma');
 
   // El filtro por nombre sigue encontrando la tarea sin vincular
-  const fantasma = await operationsService.listarTareas({ asignado_a: 'Fantasma' });
+  const fantasma = await operationsService.listarTareas({ tablero_id: TABLERO, asignado_a: 'Fantasma' }, ADMIN);
   assert.deepEqual(fantasma.data.map(x => x.id), ['hist-2']);
 
   // Editar otros campos no altera su responsable histórico
-  const editada = await operationsService.actualizarTarea('hist-2', { titulo: 'externa 2', asignado_a: 'Fantasma' });
+  const editada = await operationsService.actualizarTarea('hist-2', { titulo: 'externa 2', asignado_a: 'Fantasma' }, ADMIN);
   assert.equal(editada.asignado_a, 'Fantasma');
 });
 
 test('Nexi mis_tareas: incluye tareas compartidas del usuario de la sesión', async (t) => {
   const { A, B } = preparar(t);
-  await operationsService.crearTarea({ titulo: 'compartida', asignados: [A.id, B.id] });
-  await operationsService.crearTarea({ titulo: 'de-beto', asignados: [B.id] });
+  await operationsService.crearTarea({ tablero_id: TABLERO, titulo: 'compartida', asignados: [A.id, B.id] }, ADMIN);
+  await operationsService.crearTarea({ tablero_id: TABLERO, titulo: 'de-beto', asignados: [B.id] }, ADMIN);
   const { filas, total } = await nexiDatos.tareasAbiertasAsignadasA({ id: A.id, nombre: 'Ana' }, 10);
   assert.equal(total, 1);
   assert.deepEqual(filas.map(f => f.titulo), ['compartida']);
@@ -267,7 +274,7 @@ test('Nexi mis_tareas: incluye tareas compartidas del usuario de la sesión', as
 
 test('eliminar tarea elimina sus asignaciones', async (t) => {
   const { A, B, db } = preparar(t);
-  const { id } = await operationsService.crearTarea({ titulo: 'T', asignados: [A.id, B.id] });
-  await operationsService.eliminarTarea(id);
+  const { id } = await operationsService.crearTarea({ tablero_id: TABLERO, titulo: 'T', asignados: [A.id, B.id] }, ADMIN);
+  await operationsService.eliminarTarea(id, ADMIN);
   assert.equal(db.tarea_asignados.length, 0);
 });

@@ -14,6 +14,7 @@ const deudasRoutes = require('./finance/routes/deudas');
 // Operations module
 const tareasRoutes = require('./operations/routes/tareas');
 const etapasRoutes = require('./operations/routes/etapas');
+const tablerosRoutes = require('./operations/routes/tableros');
 
 // CRM module
 const contactosRoutes = require('./crm/routes/contactos');
@@ -78,6 +79,7 @@ app.use('/api/finance/deudas', deudasRoutes);
 // ── Operations ───────────────────────────────────────
 app.use('/api/operations/tareas', tareasRoutes);
 app.use('/api/operations/etapas', etapasRoutes);
+app.use('/api/operations/tableros', tablerosRoutes);
 
 // ── CRM ──────────────────────────────────────────────
 app.use('/api/crm/contactos', contactosRoutes);

@@ -2,6 +2,7 @@ const supabase = require('../../config/supabase');
 const { resolverPeriodo, rangoMes } = require('../../utils/periodo');
 const { TIPOS_BASE, TIPOS_BASE_CERRADOS, ESTADO_CANONICO_POR_TIPO_BASE } = require('../config/etapas');
 const tareaAsignados = require('./tareaAsignados');
+const tablerosService = require('./tablerosService');
 
 // Columnas que devuelven los endpoints de tareas: la tarea, su etapa y sus asignados.
 const SELECT_TAREA = `*, operativo_etapas(id, nombre, color, tipo_base, posicion), ${tareaAsignados.SELECT_ASIGNADOS}`;
@@ -39,6 +40,15 @@ function conDiasTrabajo(tarea) {
   return { ...tarea, dias_trabajo };
 }
 
+function error400(mensaje) {
+  return Object.assign(new Error(mensaje), { status: 400 });
+}
+
+// solo_mias llega por query string ("true"/"1") o como boolean.
+function esVerdadero(v) {
+  return v === true || v === 'true' || v === '1';
+}
+
 // Forma de respuesta de una tarea: asignados aplanados + dias_trabajo.
 function formatearTarea(tarea) {
   return conDiasTrabajo(tareaAsignados.conAsignados(tarea));
@@ -59,7 +69,8 @@ class OperationsService {
 
   // Devuelve todo el historial de una tarea ordenado del más reciente al más antiguo.
   // Usado por GET /api/operations/tareas/:id/historial
-  async obtenerHistorial(tarea_id) {
+  async obtenerHistorial(tarea_id, user) {
+    await this._asegurarAccesoTarea(tarea_id, user);
     const { data, error } = await supabase
       .from('tarea_historial')
       .select('*')
@@ -123,11 +134,62 @@ class OperationsService {
     return formatearTarea(data);
   }
 
-  // Solo devuelve tareas directas (tipo = 'asignacion') — las propuestas van por su propio endpoint
-  async listarTareas({ estado, prioridad, asignado_a, asignado_id, etapa_id } = {}) {
+  // ── Tableros ───────────────────────────────────────────────────────────────
+
+  // Lee la tarea y verifica que el usuario pueda ver su tablero. Las tareas sin
+  // tablero (creadas por un backend anterior a los tableros) solo las ve el
+  // mando alto. Devuelve la fila de la tarea. 404 si no existe.
+  async _asegurarAccesoTarea(id, user) {
+    const { data: tarea, error } = await supabase.from('tareas').select('*').eq('id', id).maybeSingle();
+    if (error) {
+      if (error.code === '22P02') throw Object.assign(new Error('Tarea no encontrada'), { status: 404 });
+      throw error;
+    }
+    if (!tarea) throw Object.assign(new Error('Tarea no encontrada'), { status: 404 });
+
+    if (tarea.tablero_id) {
+      await tablerosService.asegurarAcceso(tarea.tablero_id, user);
+    } else if (!tablerosService.esMandoAlto(user)) {
+      throw Object.assign(new Error('No tenés acceso a esta tarea.'), { status: 403 });
+    }
+    return tarea;
+  }
+
+  // Los responsables que se agregan a una tarea deben ser miembros de su
+  // tablero. `actuales` (en una edición) pueden mantenerse aunque ya no sean
+  // miembros: quitar a alguien del tablero no le quita sus tareas.
+  async _validarResponsablesMiembros(tableroId, ids, actuales = []) {
+    const nuevos = ids.filter(id => !actuales.includes(id));
+    if (!nuevos.length) return;
+    const miembros = await tablerosService.idsMiembros(tableroId);
+    const noMiembros = nuevos.filter(id => !miembros.includes(id));
+    if (noMiembros.length) {
+      throw error400(`El responsable debe ser miembro del tablero (no son miembros: ${noMiembros.join(', ')}).`);
+    }
+  }
+
+  // Asignación legacy por nombre (`asignado_a`): con tableros, el nombre tiene
+  // que identificar a un único usuario para poder verificar que sea miembro.
+  async _resolverAsignadoLegacyEnTablero(asignado_a, tableroId, actuales = []) {
+    const asignacion = await tareaAsignados.resolverAsignadoLegacy(asignado_a);
+    if (asignacion.texto) {
+      throw error400(`El responsable debe ser miembro del tablero: "${asignacion.texto}" no corresponde a un único usuario.`);
+    }
+    await this._validarResponsablesMiembros(tableroId, asignacion.ids, actuales);
+    return asignacion;
+  }
+
+  // ── Tareas: listado y CRUD ─────────────────────────────────────────────────
+
+  // Solo devuelve tareas directas (tipo = 'asignacion') — las propuestas van por su propio endpoint.
+  // `tablero_id` es obligatorio y el usuario tiene que poder ver ese tablero.
+  async listarTareas({ estado, prioridad, asignado_a, asignado_id, etapa_id, tablero_id } = {}, user) {
+    await tablerosService.asegurarAcceso(tablero_id, user);
+
     let query = supabase
       .from('tareas')
       .select(SELECT_TAREA)
+      .eq('tablero_id', tablero_id)
       .or('tipo.is.null,tipo.eq.asignacion')
       .order('created_at', { ascending: false });
 
@@ -146,18 +208,26 @@ class OperationsService {
   // usuario_nombre y usuario_id se extraen del body pero NO se guardan en tareas.
   // `asignados` (array de usuario_id) define las personas asignadas; si no viene,
   // se acepta el `asignado_a` (nombre) histórico por compatibilidad.
-  async crearTarea(body) {
+  // `tablero_id` es obligatorio, el usuario tiene que poder ver ese tablero y
+  // los responsables tienen que ser miembros.
+  async crearTarea(body, user) {
     const {
       titulo, descripcion, prioridad, asignado_a, asignados, fecha_limite,
       tipo, propuesto_por, estado_propuesta,
       usuario_nombre, usuario_id,
-      etapa_id, fecha_inicio_planeada,
+      etapa_id, fecha_inicio_planeada, tablero_id,
     } = body;
     if (!titulo) throw Object.assign(new Error('El título es obligatorio'), { status: 400 });
 
-    const asignacion = asignados !== undefined
-      ? { ids: await tareaAsignados.validarAsignados(asignados), texto: null }
-      : await tareaAsignados.resolverAsignadoLegacy(asignado_a);
+    await tablerosService.asegurarAcceso(tablero_id, user);
+
+    let asignacion;
+    if (asignados !== undefined) {
+      asignacion = { ids: await tareaAsignados.validarAsignados(asignados), texto: null };
+      await this._validarResponsablesMiembros(tablero_id, asignacion.ids);
+    } else {
+      asignacion = await this._resolverAsignadoLegacyEnTablero(asignado_a, tablero_id);
+    }
 
     const etapa = await this._resolverEtapa(etapa_id);
 
@@ -166,6 +236,7 @@ class OperationsService {
       descripcion,
       estado:                 ESTADO_CANONICO_POR_TIPO_BASE[etapa.tipo_base],
       etapa_id:                etapa.id,
+      tablero_id,
       prioridad:               prioridad        || 'Media',
       // Con asignados vinculados, la sincronización completa este texto.
       asignado_a:              asignacion.texto,
@@ -219,26 +290,36 @@ class OperationsService {
   // Asignados: `asignados` es la lista FINAL completa (agregar, quitar o reemplazar
   // personas = enviar la lista resultante). Si no viene y llega un `asignado_a`
   // distinto del actual, se trata como asignación legacy a una sola persona.
-  async actualizarTarea(id, body) {
+  //
+  // El usuario tiene que poder ver el tablero de la tarea. Los responsables que
+  // se agregan deben ser miembros del tablero; los que ya estaban se conservan
+  // aunque hayan dejado de serlo. Una tarea no cambia de tablero.
+  async actualizarTarea(id, body, user) {
     // Separar campos de auditoría (no pertenecen a la tabla tareas)
     const { usuario_nombre, usuario_id, asignados, ...camposTarea } = body;
 
     // Leer estado actual ANTES de actualizar: sirve para comparar en el historial y
     // para saber si fecha_inicio_real/fecha_fin_real ya estaban cargadas (no pisarlas)
-    const { data: tareaActual, error: errLectura } = await supabase
-      .from('tareas')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (errLectura) throw errLectura;
+    const tareaActual = await this._asegurarAccesoTarea(id, user);
+
+    if ('tablero_id' in camposTarea) {
+      if (camposTarea.tablero_id !== tareaActual.tablero_id) {
+        throw error400('No se puede cambiar el tablero de una tarea.');
+      }
+      delete camposTarea.tablero_id;
+    }
 
     // Validar asignados ANTES de escribir nada.
     let asignacion = null;
     if (asignados !== undefined) {
       const actuales = await tareaAsignados.usuarioIdsDeTarea(id);
       asignacion = { ids: await tareaAsignados.validarAsignados(asignados, actuales), texto: null };
+      if (tareaActual.tablero_id) await this._validarResponsablesMiembros(tareaActual.tablero_id, asignacion.ids, actuales);
     } else if ('asignado_a' in camposTarea && normalizar(camposTarea.asignado_a) !== normalizar(tareaActual.asignado_a)) {
-      asignacion = await tareaAsignados.resolverAsignadoLegacy(camposTarea.asignado_a);
+      const actuales = await tareaAsignados.usuarioIdsDeTarea(id);
+      asignacion = tareaActual.tablero_id
+        ? await this._resolverAsignadoLegacyEnTablero(camposTarea.asignado_a, tareaActual.tablero_id, actuales)
+        : await tareaAsignados.resolverAsignadoLegacy(camposTarea.asignado_a);
     }
     // asignado_a lo mantiene la sincronización; un valor sin cambios se ignora
     // (clientes que reenvían el formulario completo).
@@ -307,7 +388,8 @@ class OperationsService {
     return data;
   }
 
-  async eliminarTarea(id) {
+  async eliminarTarea(id, user) {
+    await this._asegurarAccesoTarea(id, user);
     // ON DELETE CASCADE en tarea_historial y tarea_asignados elimina historial y asignaciones
     const { error } = await supabase.from('tareas').delete().eq('id', id);
     if (error) throw error;
@@ -323,11 +405,28 @@ class OperationsService {
   // en el orden del tablero) y `porTipoBase` (agregado por tipo_base interno,
   // útil para tarjetas resumen). `vencida` = fecha_limite pasada y la etapa de la
   // tarea no es de un tipo_base cerrado (ver TIPOS_BASE_CERRADOS).
-  async getMetricas({ mes, anio } = {}) {
+  //
+  // Totales de las tarjetas: `pendientes`, `enProceso` y `completadas` agrupan
+  // las etapas por su estado canónico (ESTADO_CANONICO_POR_TIPO_BASE; las
+  // canceladas no entran en ninguno de los tres).
+  //
+  // `tablero_id` (opcional): limita a un tablero que el usuario pueda ver. Sin
+  // él, totales globales (lo usa Nexi para el resumen del dashboard).
+  // `solo_mias` (opcional): solo las tareas donde el usuario es responsable.
+  async getMetricas({ mes, anio, tablero_id, solo_mias } = {}, user) {
     let query = supabase
       .from('tareas')
       .select('fecha_limite, etapa_id, operativo_etapas(tipo_base)')
       .or('tipo.is.null,tipo.eq.asignacion');
+
+    if (tablero_id) {
+      await tablerosService.asegurarAcceso(tablero_id, user);
+      query = query.eq('tablero_id', tablero_id);
+    }
+    if (esVerdadero(solo_mias)) {
+      const ids = user?.id ? await tareaAsignados.idsTareasDePersona({ usuarioIds: [user.id] }) : [];
+      query = query.in('id', ids);
+    }
 
     const periodoProvisto = (mes ?? '') !== '' || (anio ?? '') !== '';
     if (periodoProvisto) {
@@ -364,17 +463,44 @@ class OperationsService {
       t.operativo_etapas?.tipo_base && !TIPOS_BASE_CERRADOS.includes(t.operativo_etapas.tipo_base)
     ).length;
 
-    return { total: data.length, porEtapa, porTipoBase, vencidas };
+    const porEstado = { Pendiente: 0, 'En Proceso': 0, Completada: 0 };
+    for (const [tipoBase, cantidad] of Object.entries(porTipoBase)) {
+      const estado = ESTADO_CANONICO_POR_TIPO_BASE[tipoBase];
+      if (estado in porEstado) porEstado[estado] += cantidad;
+    }
+
+    return {
+      total: data.length,
+      pendientes: porEstado.Pendiente,
+      enProceso: porEstado['En Proceso'],
+      completadas: porEstado.Completada,
+      vencidas,
+      porEtapa,
+      porTipoBase,
+    };
   }
 
   // ── Propuestas ─────────────────────────────────────────────────────────────
 
-  async listarPropuestas({ propuesto_por, asignado_a, asignado_id } = {}) {
+  // Con `tablero_id`, las propuestas de ese tablero (si el usuario lo ve); sin
+  // él, las de todos los tableros que el usuario ve.
+  async listarPropuestas({ propuesto_por, asignado_a, asignado_id, tablero_id } = {}, user) {
     let query = supabase
       .from('tareas')
       .select(`*, ${tareaAsignados.SELECT_ASIGNADOS}`)
       .eq('tipo', 'propuesta')
       .order('created_at', { ascending: false });
+
+    if (tablero_id) {
+      await tablerosService.asegurarAcceso(tablero_id, user);
+      query = query.eq('tablero_id', tablero_id);
+    } else {
+      const visibles = await tablerosService.idsVisibles(user);
+      if (visibles) {
+        if (!visibles.length) return { data: [], total: 0 };
+        query = query.in('tablero_id', visibles);
+      }
+    }
 
     if (propuesto_por) query = query.eq('propuesto_por', propuesto_por);
     query = await this._filtrarPorPersona(query, { asignado_id, asignado_a });
@@ -388,14 +514,9 @@ class OperationsService {
   // Aprueba una propuesta (tipo → 'asignacion', estado_propuesta → 'aprobada', estado → 'Pendiente')
   // y registra el evento en tarea_historial.
   // usuario_nombre y usuario_id provienen del body del request (enviados por el frontend).
-  async aprobarPropuesta(id, { usuario_nombre, usuario_id } = {}) {
+  async aprobarPropuesta(id, { usuario_nombre, usuario_id } = {}, user) {
     // Leer estado actual para registrar el valor anterior en historial
-    const { data: antes, error: errLectura } = await supabase
-      .from('tareas')
-      .select('estado_propuesta')
-      .eq('id', id)
-      .single();
-    if (errLectura) throw errLectura;
+    const antes = await this._asegurarAccesoTarea(id, user);
 
     // Al aprobar, la tarea entra al tablero en la etapa inicial (tipo_base 'pendiente')
     const etapaInicial = await this._resolverEtapa(null);
@@ -423,14 +544,9 @@ class OperationsService {
 
   // Rechaza una propuesta (estado_propuesta → 'rechazada')
   // y registra el evento en tarea_historial.
-  async rechazarPropuesta(id, { usuario_nombre, usuario_id } = {}) {
+  async rechazarPropuesta(id, { usuario_nombre, usuario_id } = {}, user) {
     // Leer estado actual para registrar el valor anterior en historial
-    const { data: antes, error: errLectura } = await supabase
-      .from('tareas')
-      .select('estado_propuesta')
-      .eq('id', id)
-      .single();
-    if (errLectura) throw errLectura;
+    const antes = await this._asegurarAccesoTarea(id, user);
 
     const { data, error } = await supabase
       .from('tareas')
