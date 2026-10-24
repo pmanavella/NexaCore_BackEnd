@@ -4,26 +4,26 @@ Se actualiza cada vez que se diseña un caso, se automatiza un test o se registr
 
 ## Requisito → caso → test → defecto
 
-| Requisito | Casos de prueba | Tests automatizados | Defectos | Estado |
-|---|---|---|---|---|
-| REQ-FIN-01 | | | | Sin casos |
-| REQ-FIN-02 | CP-FIN-02-01 a 02-15 | `test/finanzas.movimientos.test.js` (02-01 a 02-15) | DEF-007 (#24), DEF-008 (#25) | Corregido, pendiente de merge y verificación |
-| REQ-FIN-03 | CP-FIN-03-01 a 03-15 | `test/finanzas.montos.test.js` (03-01 a 03-04, 03-11 a 03-15) | DEF-005 (#22) | Corregido, pendiente de merge y verificación |
-| REQ-FIN-04 | CP-FIN-04-01 a 04-15 | `test/finanzas.montos.test.js` (04-10 a 04-12), `test/finanzas.importacion.test.js` (04-01), `test/finanzas.excel-validacion.test.js` (04-03, 04-04), `test/finanzas.fechas.test.js` (04-13 a 04-15) | DEF-006 (#23), DEF-012 (#30), DEF-014 (#32), DEF-015 (#33) | Corregido, pendiente de merge y verificación |
-| REQ-FIN-05 | CP-FIN-05-01 a 05-16 | `test/finanzas.sueldos.test.js` (05-01 a 05-10, 05-13 a 05-16) | DEF-009 (#26), DEF-011 (#28) | Corregido, pendiente de merge y verificación |
-| REQ-FIN-06 | CP-FIN-06-01 a 06-17 | `test/finanzas.sueldos.test.js` (06-07 a 06-09, 06-11 a 06-17) | DEF-010 (#27) | Corregido, pendiente de merge y verificación |
-| REQ-FIN-07 | CP-FIN-07-01 a 07-05 | `test/finanzas.suscripciones-validacion.test.js` (07-01 a 07-04); 07-05 cubierto por `test/finanzas.suscripciones.test.js` | DEF-016 (#34) | Corregido, pendiente de merge y verificación |
-| REQ-FIN-08 | CP-FIN-08-01 a 08-09 | `test/finanzas.suscripciones.test.js` (08-01 a 08-08), `test/finanzas.suscripciones.test.js` (08-01 a 08-08, servicio), `test/finanzas.suscripciones-endpoint.test.js` (08-06) | DEF-017 (#35) | Con defectos abiertos |
-| REQ-FIN-09 | CP-FIN-09-01 | `test/finanzas.comprobantes.test.js` | — | Ejecutado sin defectos |
-| REQ-FIN-10 | | | | Sin casos |
-| REQ-FIN-11 | | | | Sin casos |
-| REQ-FIN-12 | | | | Sin casos |
-| REQ-FIN-13 | CP-FIN-13-01 a 13-12 | `test/dolarService.test.js` del frontend (13-01 a 13-12) | DEF-013 (#31) | Corregido, pendiente de merge y verificación |
-| REQ-FIN-14 | CP-FIN-14-01 a 14-07 | | | Diseñado |
-| REQ-FIN-15 | CP-FIN-15-01, 15-02 | | | Diseñado |
-| REQ-FIN-16 | CP-FIN-16-01 a 16-12 | `test/finanzas.permisos.test.js` (16-01 a 16-08, 16-12) | DEF-001 (#18), DEF-002 (#19), DEF-003 (#20) | Corregido, pendiente de merge y verificación |
-| REQ-FIN-17 | CP-FIN-17-01 a 17-05 | `test/finanzas.permisos.test.js` (17-01, 17-02, 17-04, 17-05) | DEF-004 (#21) | Corregido, pendiente de merge y verificación |
-| REQ-FIN-18 | CP-FIN-18-01 a 18-12 (en `plan-contingencia.md`) | | | Diseñado |
+| Requisito  | Casos de prueba                                  | Tests automatizados                                                                                                                                                                                  | Defectos                                                   | Estado                                       |
+| ---------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------- |
+| REQ-FIN-01 |                                                  |                                                                                                                                                                                                      |                                                            | Sin casos                                    |
+| REQ-FIN-02 | CP-FIN-02-01 a 02-15                             | `test/finanzas.movimientos.test.js` (02-01 a 02-15)                                                                                                                                                  | DEF-007 (#24), DEF-008 (#25)                               | Corregido, pendiente de merge y verificación |
+| REQ-FIN-03 | CP-FIN-03-01 a 03-15                             | `test/finanzas.montos.test.js` (03-01 a 03-04, 03-11 a 03-15)                                                                                                                                        | DEF-005 (#22)                                              | Corregido, pendiente de merge y verificación |
+| REQ-FIN-04 | CP-FIN-04-01 a 04-15                             | `test/finanzas.montos.test.js` (04-10 a 04-12), `test/finanzas.importacion.test.js` (04-01), `test/finanzas.excel-validacion.test.js` (04-03, 04-04), `test/finanzas.fechas.test.js` (04-13 a 04-15) | DEF-006 (#23), DEF-012 (#30), DEF-014 (#32), DEF-015 (#33) | Corregido, pendiente de merge y verificación |
+| REQ-FIN-05 | CP-FIN-05-01 a 05-16                             | `test/finanzas.sueldos.test.js` (05-01 a 05-10, 05-13 a 05-16)                                                                                                                                       | DEF-009 (#26), DEF-011 (#28)                               | Corregido, pendiente de merge y verificación |
+| REQ-FIN-06 | CP-FIN-06-01 a 06-17                             | `test/finanzas.sueldos.test.js` (06-07 a 06-09, 06-11 a 06-17)                                                                                                                                       | DEF-010 (#27)                                              | Corregido, pendiente de merge y verificación |
+| REQ-FIN-07 | CP-FIN-07-01 a 07-05                             | `test/finanzas.suscripciones-validacion.test.js` (07-01 a 07-04); 07-05 cubierto por `test/finanzas.suscripciones.test.js`                                                                           | DEF-016 (#34)                                              | Corregido, pendiente de merge y verificación |
+| REQ-FIN-08 | CP-FIN-08-01 a 08-09                             | `test/finanzas.suscripciones.test.js` (08-01 a 08-08), `test/finanzas.suscripciones.test.js` (08-01 a 08-08, servicio), `test/finanzas.suscripciones-endpoint.test.js` (08-06)                       | DEF-017 (#35)                                              | Con defectos abiertos                        |
+| REQ-FIN-09 | CP-FIN-09-01                                     | `test/finanzas.comprobantes.test.js`                                                                                                                                                                 | —                                                          | Ejecutado sin defectos                       |
+| REQ-FIN-10 |                                                  |                                                                                                                                                                                                      |                                                            | Sin casos                                    |
+| REQ-FIN-11 |                                                  |                                                                                                                                                                                                      |                                                            | Sin casos                                    |
+| REQ-FIN-12 |                                                  |                                                                                                                                                                                                      |                                                            | Sin casos                                    |
+| REQ-FIN-13 | CP-FIN-13-01 a 13-12                             | `test/dolarService.test.js` del frontend (13-01 a 13-12)                                                                                                                                             | DEF-013 (#31)                                              | Corregido, pendiente de merge y verificación |
+| REQ-FIN-14 | CP-FIN-14-01 a 14-07                             |                                                                                                                                                                                                      |                                                            | Diseñado                                     |
+| REQ-FIN-15 | CP-FIN-15-01, 15-02                              |                                                                                                                                                                                                      |                                                            | Diseñado                                     |
+| REQ-FIN-16 | CP-FIN-16-01 a 16-12                             | `test/finanzas.permisos.test.js` (16-01 a 16-08, 16-12), `test/integracion/supabase.rls.test.js` (16-09, contra nexacore-test)                                                                       | DEF-001 (#18), DEF-002 (#19), DEF-003 (#20), DEF-018 (#39) | Corregido, pendiente de merge y verificación |
+| REQ-FIN-17 | CP-FIN-17-01 a 17-05                             | `test/finanzas.permisos.test.js` (17-01, 17-02, 17-04, 17-05)                                                                                                                                        | DEF-004 (#21)                                              | Corregido, pendiente de merge y verificación |
+| REQ-FIN-18 | CP-FIN-18-01 a 18-12 (en `plan-contingencia.md`) |                                                                                                                                                                                                      |                                                            | Diseñado                                     |
 
 Estados posibles: Sin casos · Diseñado · Ejecutado sin defectos · Con defectos abiertos · Corregido, pendiente de merge y verificación · Defectos verificados.
 
@@ -33,74 +33,77 @@ Tests de cobertura sin caso de prueba asociado (rama `test/cobertura-finanzas`, 
 
 Antes de abrir un issue, tomar el siguiente número libre y anotarlo aquí.
 
-| DEF | Issue | Título | Caso | Severidad | Detectado | Corregido | Regresión |
-|---|---|---|---|---|---|---|---|
-| DEF-001 | #18 | Usuarios sin permiso de Finanzas consultan y modifican datos | CP-FIN-16-04, 16-05 | Crítica | 2026-10-17 | 2026-10-18 · `fix/DEF-001-004-permisos` | CP-FIN-16-04, 16-05, 16-12 |
-| DEF-002 | #19 | Usuario con permiso lector puede crear, editar y borrar | CP-FIN-16-08 | Alta | 2026-10-17 | 2026-10-18 · `fix/DEF-001-004-permisos` | CP-FIN-16-08 |
-| DEF-003 | #20 | Usuarios con permiso reciben 403 al consultar la cotización | CP-FIN-16-06, 16-07 | Media | 2026-10-17 | 2026-10-18 · `fix/DEF-001-004-permisos` | CP-FIN-16-06, 16-07 |
-| DEF-004 | #21 | Dirección no puede confirmar ni revertir migraciones | CP-FIN-17-05 | Alta | 2026-10-17 | 2026-10-18 · `fix/DEF-001-004-permisos` | CP-FIN-17-05 |
-| DEF-005 | #22 | La migración guarda montos incorrectos por comas y puntos | CP-FIN-03-01, 03-02, 03-11, 03-12, 03-14 | Crítica | 2026-10-17 | 2026-10-18 · `fix/DEF-005-006-montos` | CP-FIN-03-01, 02, 11, 12, 14 |
-| DEF-006 | #23 | El Excel rechaza o guarda mal montos con formato argentino | CP-FIN-04-10, 04-11, 04-12 | Crítica | 2026-10-17 | 2026-10-18 · `fix/DEF-005-006-montos` | CP-FIN-04-10, 11, 12 |
-| DEF-007 | #24 | El alta de movimientos no valida monto no numérico, fecha inexistente ni rango | CP-FIN-02-06, 02-08, 02-11, 02-13 | Media | 2026-10-18 | 2026-10-18 · `fix/DEF-007-008-movimientos` | CP-FIN-02-06, 08, 11, 13, 14, 15; 09-01 |
-| DEF-008 | #25 | Mensaje engañoso con monto 0 en el alta de movimientos | CP-FIN-02-04 | Baja | 2026-10-18 | 2026-10-18 · `fix/DEF-007-008-movimientos` | CP-FIN-02-04 |
-| DEF-009 | #26 | Los movimientos salariales aceptan montos y cantidades negativos | CP-FIN-05-06, 05-07 | Media | 2026-10-18 | 2026-10-18 · `fix/DEF-009-011-sueldos-validaciones` | CP-FIN-05-06, 07, 13 |
-| DEF-010 | #27 | Sueldos en dólares guardados como pesos, sin verificar la conversión | CP-FIN-06-07, 06-08 | Crítica | 2026-10-18 | 2026-10-18 · `fix/DEF-010-sueldos-usd` | CP-FIN-06-07, 08, 11 a 17 |
-| DEF-011 | #28 | Tipo de salario reemplazado en silencio; la edición cambia la estructura de pago | CP-FIN-05-09, 05-10 | Alta | 2026-10-18 | 2026-10-18 · `fix/DEF-009-011-sueldos-validaciones` | CP-FIN-05-09, 10, 14, 15, 16 |
-| DEF-012 | #30 | La importación por Excel rechaza el archivo completo si incluye la categoría Suscripción | CP-FIN-04-01 | Media | 2026-10-19 | 2026-10-19 · `fix/DEF-012-suscripcion-importacion` (1801943) | CP-FIN-04-01 |
-| DEF-013 | #31 | Se acepta una cotización del dólar no numérica (NaN) en lugar de usar la fuente siguiente | CP-FIN-13-09 | Media | 2026-10-19 | 2026-10-19 · `test/dolar-service` (frontend) | CP-FIN-13-09 |
-| DEF-014 | #32 | La importación por Excel rechaza fechas DD/MM/YYYY aunque la plantilla anuncia ese formato | CP-FIN-04-03 | Media | 2026-10-19 | 2026-10-19 · `fix/DEF-012-suscripcion-importacion` | CP-FIN-04-03 |
-| DEF-015 | #33 | La importación por Excel acepta fechas inexistentes (2026-02-31) | CP-FIN-04-04 | Media | 2026-10-19 | 2026-10-19 · `fix/DEF-015-fechas-inexistentes` (32668b8) | CP-FIN-04-04, 13, 14, 15 |
-| DEF-016 | #34 | Una moneda o frecuencia inválida en una suscripción se reemplaza en silencio por ARS o mensual | CP-FIN-07-01 a 07-04 | Media | 2026-10-19 | 2026-10-19 · `fix/DEF-016-suscripciones-moneda-frecuencia` (5e1d73d) | CP-FIN-07-01 a 07-04; 07-05 |
-| DEF-017 | #35 | Con dias=0 la alerta de vencimientos devuelve los próximos 7 días en vez de solo los de hoy | CP-FIN-08-06 | Baja | 2026-10-19 | — | CP-FIN-08-06 |
+| DEF     | Issue | Título                                                                                         | Caso                                     | Severidad | Detectado  | Corregido                                                            | Regresión                               |
+| ------- | ----- | ---------------------------------------------------------------------------------------------- | ---------------------------------------- | --------- | ---------- | -------------------------------------------------------------------- | --------------------------------------- |
+| DEF-001 | #18   | Usuarios sin permiso de Finanzas consultan y modifican datos                                   | CP-FIN-16-04, 16-05                      | Crítica   | 2026-10-17 | 2026-10-18 · `fix/DEF-001-004-permisos`                              | CP-FIN-16-04, 16-05, 16-12              |
+| DEF-002 | #19   | Usuario con permiso lector puede crear, editar y borrar                                        | CP-FIN-16-08                             | Alta      | 2026-10-17 | 2026-10-18 · `fix/DEF-001-004-permisos`                              | CP-FIN-16-08                            |
+| DEF-003 | #20   | Usuarios con permiso reciben 403 al consultar la cotización                                    | CP-FIN-16-06, 16-07                      | Media     | 2026-10-17 | 2026-10-18 · `fix/DEF-001-004-permisos`                              | CP-FIN-16-06, 16-07                     |
+| DEF-004 | #21   | Dirección no puede confirmar ni revertir migraciones                                           | CP-FIN-17-05                             | Alta      | 2026-10-17 | 2026-10-18 · `fix/DEF-001-004-permisos`                              | CP-FIN-17-05                            |
+| DEF-005 | #22   | La migración guarda montos incorrectos por comas y puntos                                      | CP-FIN-03-01, 03-02, 03-11, 03-12, 03-14 | Crítica   | 2026-10-17 | 2026-10-18 · `fix/DEF-005-006-montos`                                | CP-FIN-03-01, 02, 11, 12, 14            |
+| DEF-006 | #23   | El Excel rechaza o guarda mal montos con formato argentino                                     | CP-FIN-04-10, 04-11, 04-12               | Crítica   | 2026-10-17 | 2026-10-18 · `fix/DEF-005-006-montos`                                | CP-FIN-04-10, 11, 12                    |
+| DEF-007 | #24   | El alta de movimientos no valida monto no numérico, fecha inexistente ni rango                 | CP-FIN-02-06, 02-08, 02-11, 02-13        | Media     | 2026-10-18 | 2026-10-18 · `fix/DEF-007-008-movimientos`                           | CP-FIN-02-06, 08, 11, 13, 14, 15; 09-01 |
+| DEF-008 | #25   | Mensaje engañoso con monto 0 en el alta de movimientos                                         | CP-FIN-02-04                             | Baja      | 2026-10-18 | 2026-10-18 · `fix/DEF-007-008-movimientos`                           | CP-FIN-02-04                            |
+| DEF-009 | #26   | Los movimientos salariales aceptan montos y cantidades negativos                               | CP-FIN-05-06, 05-07                      | Media     | 2026-10-18 | 2026-10-18 · `fix/DEF-009-011-sueldos-validaciones`                  | CP-FIN-05-06, 07, 13                    |
+| DEF-010 | #27   | Sueldos en dólares guardados como pesos, sin verificar la conversión                           | CP-FIN-06-07, 06-08                      | Crítica   | 2026-10-18 | 2026-10-18 · `fix/DEF-010-sueldos-usd`                               | CP-FIN-06-07, 08, 11 a 17               |
+| DEF-011 | #28   | Tipo de salario reemplazado en silencio; la edición cambia la estructura de pago               | CP-FIN-05-09, 05-10                      | Alta      | 2026-10-18 | 2026-10-18 · `fix/DEF-009-011-sueldos-validaciones`                  | CP-FIN-05-09, 10, 14, 15, 16            |
+| DEF-012 | #30   | La importación por Excel rechaza el archivo completo si incluye la categoría Suscripción       | CP-FIN-04-01                             | Media     | 2026-10-19 | 2026-10-19 · `fix/DEF-012-suscripcion-importacion` (1801943)         | CP-FIN-04-01                            |
+| DEF-013 | #31   | Se acepta una cotización del dólar no numérica (NaN) en lugar de usar la fuente siguiente      | CP-FIN-13-09                             | Media     | 2026-10-19 | 2026-10-19 · `test/dolar-service` (frontend)                         | CP-FIN-13-09                            |
+| DEF-014 | #32   | La importación por Excel rechaza fechas DD/MM/YYYY aunque la plantilla anuncia ese formato     | CP-FIN-04-03                             | Media     | 2026-10-19 | 2026-10-19 · `fix/DEF-012-suscripcion-importacion`                   | CP-FIN-04-03                            |
+| DEF-015 | #33   | La importación por Excel acepta fechas inexistentes (2026-02-31)                               | CP-FIN-04-04                             | Media     | 2026-10-19 | 2026-10-19 · `fix/DEF-015-fechas-inexistentes` (32668b8)             | CP-FIN-04-04, 13, 14, 15                |
+| DEF-016 | #34   | Una moneda o frecuencia inválida en una suscripción se reemplaza en silencio por ARS o mensual | CP-FIN-07-01 a 07-04                     | Media     | 2026-10-19 | 2026-10-19 · `fix/DEF-016-suscripciones-moneda-frecuencia` (5e1d73d) | CP-FIN-07-01 a 07-04; 07-05             |
+| DEF-017 | #35   | Con dias=0 la alerta de vencimientos devuelve los próximos 7 días en vez de solo los de hoy    | CP-FIN-08-06                             | Baja      | 2026-10-19 | —                                                                    | CP-FIN-08-06                            |
 
-Siguiente número libre: **DEF-018**.
+Siguiente número libre: **DEF-019**.
 
 ## Ejecuciones registradas
 
-| Fecha | Versión probada | Tests | Pasan | Fallan | Evidencia |
-|---|---|---|---|---|---|
-| 2026-10-17 | `develop @ 6d0c1d7` (tests en `test/casos-rojos @ 05037bf`) | 420 | 264 | 156 | EV-04a, EV-04b |
-| 2026-10-18 | `develop @ 6d0c1d7` (tests en `test/casos-rojos @ 186d9e7`, archivos de movimientos y sueldos) | 39 | 28 | 11 | EV-06 |
-| 2026-10-18 | `fix/DEF-005-006-montos` | 12 | 12 | 0 | EV-08 (montos) |
-| 2026-10-18 | `fix/tests-documentExtraction` | 8 | 8 | 0 | EV-09a (antes: 4 fallos), EV-09b |
-| 2026-10-18 | `fix/DEF-001-004-permisos` | 433 | 433 | 0 | EV-10a (rojo de CP-FIN-16-12), EV-10b |
-| 2026-10-18 | `fix/DEF-010-sueldos-usd` (casos CP-FIN-06) | todos | todos | 0 | EV-11a, EV-11b |
-| 2026-10-18 | `fix/DEF-009-011-sueldos-validaciones` (DEF-009) | 3 | 3 | 0 | EV-12a, EV-12b |
-| 2026-10-18 | `fix/DEF-009-011-sueldos-validaciones` (DEF-011) | 6 | 6 | 0 | EV-13a, EV-13b |
-| 2026-10-18 | `fix/DEF-007-008-movimientos` | casos 02 y 09-01 | todos | 0 | EV-14a, EV-14b |
-| 2026-10-19 | `develop @ 8819115`, línea base (tag `linea-base`); 8 tests del módulo | 343 | 343 | 0 | EV-15 |
-| 2026-10-19 | `fix/DEF-012-suscripcion-importacion`, suite completa antes / después de DEF-012 | 803 | 639 → 640 | 164 → 163 | EV-20a, EV-20b |
-| 2026-10-19 | `fix/DEF-012-suscripcion-importacion @ 607447c` (mejora H-02), suite completa | 811 | 648 | 163 | EV-21a/b, EV-22a/b |
-| 2026-10-19 | `fix/DEF-012-suscripcion-importacion`, DEF-014 (`finanzas.excel-validacion.test.js`) | 9 | 8 → 9 | 1 → 0 | EV-24a, EV-24b; suite completa 820 / 657 / 163 |
-| 2026-10-19 | `test/dolar-service` (frontend), DEF-013 | 12 | 11 → 12 | 1 → 0 | EV-23a, EV-23b |
-| 2026-10-19 | `fix/DEF-015-fechas-inexistentes @ b3fc797` (`finanzas.excel-validacion.test.js`) | 10 | 9 | 1 | EV-26a |
-| 2026-10-19 | `fix/DEF-015-fechas-inexistentes`, `finanzas.fechas.test.js` sobre la versión anterior de `fechas.js` | 11 | 9 | 2 | EV-26c |
-| 2026-10-19 | `fix/DEF-015-fechas-inexistentes @ 32668b8` (`excel-validacion` / `fechas`) | 10 / 11 | 10 / 11 | 0 | EV-26b, EV-26d |
-| 2026-10-19 | `fix/DEF-015-fechas-inexistentes @ 32668b8`, suite completa | 824 | 661 | 163 | EV-26e |
-| 2026-10-19 | Integración local de todas las ramas de corrección y `test/cobertura-finanzas`, sin subir (antes de DEF-015) | 941 | 941 | 0 | Informe, sección 7.3 |
-| 2026-10-19 | `fix/DEF-016-suscripciones-moneda-frecuencia` (`finanzas.suscripciones-validacion.test.js`) | 4 | 0 → 4 | 4 → 0 | EV-27a, EV-27b |
-| 2026-10-19 | `fix/DEF-016-suscripciones-moneda-frecuencia`, tests de suscripciones de Victoria | 30 | 30 | 0 | EV-27c |
-| 2026-10-19 | `fix/DEF-016-suscripciones-moneda-frecuencia`, suite completa | 347 | 347 | 0 | EV-27d |
+| Fecha      | Versión probada                                                                                                         | Tests            | Pasan     | Fallan    | Evidencia                                      |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------- | --------- | --------- | ---------------------------------------------- | --- | --- |
+| 2026-10-17 | `develop @ 6d0c1d7` (tests en `test/casos-rojos @ 05037bf`)                                                             | 420              | 264       | 156       | EV-04a, EV-04b                                 |
+| 2026-10-18 | `develop @ 6d0c1d7` (tests en `test/casos-rojos @ 186d9e7`, archivos de movimientos y sueldos)                          | 39               | 28        | 11        | EV-06                                          |
+| 2026-10-18 | `fix/DEF-005-006-montos`                                                                                                | 12               | 12        | 0         | EV-08 (montos)                                 |
+| 2026-10-18 | `fix/tests-documentExtraction`                                                                                          | 8                | 8         | 0         | EV-09a (antes: 4 fallos), EV-09b               |
+| 2026-10-18 | `fix/DEF-001-004-permisos`                                                                                              | 433              | 433       | 0         | EV-10a (rojo de CP-FIN-16-12), EV-10b          |
+| 2026-10-18 | `fix/DEF-010-sueldos-usd` (casos CP-FIN-06)                                                                             | todos            | todos     | 0         | EV-11a, EV-11b                                 |
+| 2026-10-18 | `fix/DEF-009-011-sueldos-validaciones` (DEF-009)                                                                        | 3                | 3         | 0         | EV-12a, EV-12b                                 |
+| 2026-10-18 | `fix/DEF-009-011-sueldos-validaciones` (DEF-011)                                                                        | 6                | 6         | 0         | EV-13a, EV-13b                                 |
+| 2026-10-18 | `fix/DEF-007-008-movimientos`                                                                                           | casos 02 y 09-01 | todos     | 0         | EV-14a, EV-14b                                 |
+| 2026-10-19 | `develop @ 8819115`, línea base (tag `linea-base`); 8 tests del módulo                                                  | 343              | 343       | 0         | EV-15                                          |
+| 2026-10-19 | `fix/DEF-012-suscripcion-importacion`, suite completa antes / después de DEF-012                                        | 803              | 639 → 640 | 164 → 163 | EV-20a, EV-20b                                 |
+| 2026-10-19 | `fix/DEF-012-suscripcion-importacion @ 607447c` (mejora H-02), suite completa                                           | 811              | 648       | 163       | EV-21a/b, EV-22a/b                             |
+| 2026-10-19 | `fix/DEF-012-suscripcion-importacion`, DEF-014 (`finanzas.excel-validacion.test.js`)                                    | 9                | 8 → 9     | 1 → 0     | EV-24a, EV-24b; suite completa 820 / 657 / 163 |
+| 2026-10-19 | `test/dolar-service` (frontend), DEF-013                                                                                | 12               | 11 → 12   | 1 → 0     | EV-23a, EV-23b                                 |
+| 2026-10-19 | `fix/DEF-015-fechas-inexistentes @ b3fc797` (`finanzas.excel-validacion.test.js`)                                       | 10               | 9         | 1         | EV-26a                                         |
+| 2026-10-19 | `fix/DEF-015-fechas-inexistentes`, `finanzas.fechas.test.js` sobre la versión anterior de `fechas.js`                   | 11               | 9         | 2         | EV-26c                                         |
+| 2026-10-19 | `fix/DEF-015-fechas-inexistentes @ 32668b8` (`excel-validacion` / `fechas`)                                             | 10 / 11          | 10 / 11   | 0         | EV-26b, EV-26d                                 |
+| 2026-10-19 | `fix/DEF-015-fechas-inexistentes @ 32668b8`, suite completa                                                             | 824              | 661       | 163       | EV-26e                                         |
+| 2026-10-19 | Integración local de todas las ramas de corrección y `test/cobertura-finanzas`, sin subir (antes de DEF-015)            | 941              | 941       | 0         | Informe, sección 7.3                           |
+| 2026-10-19 | `fix/DEF-016-suscripciones-moneda-frecuencia` (`finanzas.suscripciones-validacion.test.js`)                             | 4                | 0 → 4     | 4 → 0     | EV-27a, EV-27b                                 |
+| 2026-10-19 | `fix/DEF-016-suscripciones-moneda-frecuencia`, tests de suscripciones de Victoria                                       | 30               | 30        | 0         | EV-27c                                         |
+| 2026-10-19 | `fix/DEF-016-suscripciones-moneda-frecuencia`, suite completa                                                           | 347              | 347       | 0         | EV-27d                                         |
+| 2026-10-22 | `test/integracion-rls`, contra nexacore-test (`test/integracion/supabase.rls.test.js`), antes / después de la migración | 13               | 4 → 13    | 9 → 0     | EV-41, EV-42a/b, EV-44                         |     |     |
 
 Ninguna corrección produjo regresiones en la suite completa: cada una se comparó contra la rama de la que sale. Los 163 fallos de las ramas de la línea de importación son tests rojos de defectos corregidos en otras ramas todavía sin integrar: permisos (148), sueldos (6), movimientos (5) y `documentExtraction` (4, H-46).
 
 ## Ramas de corrección e integración
 
-| Rama | Sale de | Defectos | Estado |
-|---|---|---|---|
-| `fix/tests-documentExtraction` | `develop` | Hallazgo H-46 | Pull request #29, mergeado a `develop` el 18/10 (d443536) sin revisión; revisión posterior pendiente |
-| `fix/DEF-005-006-montos` | `test/casos-rojos` | DEF-005, 006 | Subida, sin merge |
-| `fix/DEF-012-suscripcion-importacion` | `fix/DEF-005-006-montos` | DEF-012, 014; mejora H-02 | Subida, sin merge (va después de DEF-005-006) |
-| `fix/DEF-015-fechas-inexistentes` | `fix/DEF-012-suscripcion-importacion` | DEF-015 | Subida, sin merge (va después de DEF-012) |
-| `fix/DEF-001-004-permisos` | `test/casos-rojos` | DEF-001 a 004 | Subida, sin merge |
-| `fix/DEF-010-sueldos-usd` | `test/casos-rojos` | DEF-010 | Subida, sin merge |
-| `fix/DEF-009-011-sueldos-validaciones` | `fix/DEF-010-sueldos-usd` | DEF-009, 011 | Subida, sin merge (va después de DEF-010) |
-| `fix/DEF-007-008-movimientos` | `test/casos-rojos` | DEF-007, 008 | Subida, sin merge |
-| `test/cobertura-finanzas` | `develop` | — (tests de cobertura) | Subida, sin merge |
-| `test/dolar-service` | `develop` del frontend | DEF-013 | Subida, sin merge |
-| `fix/DEF-016-suscripciones-moneda-frecuencia` | `develop` | DEF-016 | Subida, sin merge (independiente de las otras ramas) |
+| Rama                                          | Sale de                               | Defectos                                                                                   | Estado                                                                                               |
+| --------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- | ------- | ---------- | ----------------------------------------------------------------------------------- | ------------ | --- |
+| `fix/tests-documentExtraction`                | `develop`                             | Hallazgo H-46                                                                              | Pull request #29, mergeado a `develop` el 18/10 (d443536) sin revisión; revisión posterior pendiente |
+| `fix/DEF-005-006-montos`                      | `test/casos-rojos`                    | DEF-005, 006                                                                               | Subida, sin merge                                                                                    |
+| `fix/DEF-012-suscripcion-importacion`         | `fix/DEF-005-006-montos`              | DEF-012, 014; mejora H-02                                                                  | Subida, sin merge (va después de DEF-005-006)                                                        |
+| `fix/DEF-015-fechas-inexistentes`             | `fix/DEF-012-suscripcion-importacion` | DEF-015                                                                                    | Subida, sin merge (va después de DEF-012)                                                            |
+| `fix/DEF-001-004-permisos`                    | `test/casos-rojos`                    | DEF-001 a 004                                                                              | Subida, sin merge                                                                                    |
+| `fix/DEF-010-sueldos-usd`                     | `test/casos-rojos`                    | DEF-010                                                                                    | Subida, sin merge                                                                                    |
+| `fix/DEF-009-011-sueldos-validaciones`        | `fix/DEF-010-sueldos-usd`             | DEF-009, 011                                                                               | Subida, sin merge (va después de DEF-010)                                                            |
+| `fix/DEF-007-008-movimientos`                 | `test/casos-rojos`                    | DEF-007, 008                                                                               | Subida, sin merge                                                                                    |
+| `test/cobertura-finanzas`                     | `develop`                             | — (tests de cobertura)                                                                     | Subida, sin merge                                                                                    |
+| `test/dolar-service`                          | `develop` del frontend                | DEF-013                                                                                    | Subida, sin merge                                                                                    |
+| `fix/DEF-016-suscripciones-moneda-frecuencia` | `develop`                             | DEF-016                                                                                    | Subida, sin merge (independiente de las otras ramas)                                                 |
+| DEF-018                                       | #39                                   | La clave pública (anon) permite leer sueldos y asignarse permisos directamente en Supabase | CP-FIN-16-09                                                                                         | Crítica | 2026-10-22 | 2026-10-22 · `test/integracion-rls` (migración `2026-10-22_quitar_acceso_anon.sql`) | CP-FIN-16-09 |     |
 
 **Integración propuesta**, cuando esté el pipeline de Valentina:
+
 1. ~~Mergear el pull request #29 a `develop`~~. Hecho el 18/10, sin revisión; falta la revisión de otra integrante.
 2. Abrir un pull request de `test/casos-rojos` a `develop` para registrar la **ejecución fallida en el pipeline**. No se mergea.
 3. Crear una rama de integración que una todas las ramas de corrección y `test/cobertura-finanzas`, respetando el orden: DEF-005-006 → DEF-012 → DEF-015, y DEF-010 → DEF-009-011. Abrir el pull request a `develop`: el pipeline debería quedar en verde. La integración local previa, sin DEF-015, dio 941 de 941.
@@ -109,7 +112,7 @@ Ninguna corrección produjo regresiones en la suite completa: cada una se compar
 
 ## Casos bloqueados o corregidos
 
-| Caso | Estado | Detalle |
-|---|---|---|
-| CP-FIN-05-16 | Rojo verificado sin captura | El rojo se comprobó ejecutándolo sobre el código anterior (`b776d88`) |
-| CP-FIN-05-01 | Diseño corregido el 18/10 | Asumía que el backend calcula el sueldo mensual; ver `casos/REQ-FIN-05-06.md`, "Correcciones de diseño" |
+| Caso         | Estado                      | Detalle                                                                                                 |
+| ------------ | --------------------------- | ------------------------------------------------------------------------------------------------------- |
+| CP-FIN-05-16 | Rojo verificado sin captura | El rojo se comprobó ejecutándolo sobre el código anterior (`b776d88`)                                   |
+| CP-FIN-05-01 | Diseño corregido el 18/10   | Asumía que el backend calcula el sueldo mensual; ver `casos/REQ-FIN-05-06.md`, "Correcciones de diseño" |
