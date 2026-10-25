@@ -144,7 +144,7 @@ test('chat con contextoModulo protocolos: solo herramientas de Protocolos', asyn
 test('mi_posicion_organigrama: responsable y reportes directos, sin emails, teléfonos ni ids', async (t) => {
   preparar(t, { organizacion: { permiso: 'lector', alcance: 'propio' } });
   t.mock.method(organizacionService, 'obtenerOrganigrama', async () => organigrama());
-  const r = await ejecutar('mi_posicion_organigrama');
+  const r = await ejecutar('mi_posicion_organigrama', {}, DIRECTORA);
   assert.equal(r.estado, 'OK');
   const d = r.resultado.datos;
   assert.equal(d.posicion.cargo, 'Project Manager');
@@ -156,14 +156,14 @@ test('mi_posicion_organigrama: responsable y reportes directos, sin emails, tel�
 test('mi_posicion_organigrama: usuario sin nodo → lo informa sin inventar', async (t) => {
   preparar(t, { organizacion: 'lector' });
   t.mock.method(organizacionService, 'obtenerOrganigrama', async () => []);
-  const r = await ejecutar('mi_posicion_organigrama');
+  const r = await ejecutar('mi_posicion_organigrama', {}, DIRECTORA);
   assert.equal(r.resultado.datos.en_organigrama, false);
 });
 
 test('mi_equipo: alcance propio no alcanza para ver el equipo (no se ofrece ni se ejecuta)', async (t) => {
   preparar(t, { organizacion: { permiso: 'lector', alcance: 'propio' } });
   const org = t.mock.method(organizacionService, 'obtenerOrganigrama', async () => organigrama());
-  const r = await ejecutar('mi_equipo');
+  const r = await ejecutar('mi_equipo', {}, DIRECTORA);
   assert.equal(r.estado, 'DENEGADO');
   assert.equal(r.motivo, 'ALCANCE_INSUFICIENTE');
   assert.equal(org.mock.callCount(), 0);
@@ -172,10 +172,10 @@ test('mi_equipo: alcance propio no alcanza para ver el equipo (no se ofrece ni s
 test('mi_equipo: equipo_directo ve reportes directos y distingue usuario/empleado; no ve la estructura completa', async (t) => {
   preparar(t, { organizacion: { permiso: 'lector', alcance: 'equipo_directo' } });
   t.mock.method(organizacionService, 'obtenerOrganigrama', async () => organigrama());
-  const r = await ejecutar('mi_equipo');
+  const r = await ejecutar('mi_equipo', {}, DIRECTORA);
   assert.equal(r.resultado.datos.total, 2);
   assert.deepEqual(r.resultado.datos.por_tipo, { usuario: 1, empleado: 1 });
-  const completa = await ejecutar('mi_equipo', { alcance_equipo: 'estructura_completa' });
+  const completa = await ejecutar('mi_equipo', { alcance_equipo: 'estructura_completa' }, DIRECTORA);
   assert.equal(completa.estado, 'DENEGADO');
   assert.equal(completa.motivo, 'ALCANCE_INSUFICIENTE');
 });
@@ -183,11 +183,35 @@ test('mi_equipo: equipo_directo ve reportes directos y distingue usuario/emplead
 test('mi_equipo: subárbol incluye externos y nunca a superiores ni pares', async (t) => {
   preparar(t, { organizacion: { permiso: 'lector', alcance: 'subarbol' } });
   t.mock.method(organizacionService, 'obtenerOrganigrama', async () => organigrama());
-  const r = await ejecutar('mi_equipo', { alcance_equipo: 'estructura_completa' });
+  const r = await ejecutar('mi_equipo', { alcance_equipo: 'estructura_completa' }, DIRECTORA);
   const d = r.resultado.datos;
   assert.equal(d.total, 3);
   assert.equal(d.por_tipo.externo, 1);
   assert.ok(!d.personas.some(p => p.nombre === 'Jefa Uno'));
+});
+
+test('organigrama en Nexi: mi_posicion y mi_equipo exigen los mismos roles que GET /organigrama', async (t) => {
+  const { ROLES_ORGANIGRAMA } = require('../organization/config/permisos');
+  const niveles = new Map([['organizacion', { nivel: 'lector', alcance: 'global' }]]);
+  const nombresOrg = u => registry.herramientasDisponibles(niveles, 'organizacion', u).map(h => h.nombre);
+  for (const role of ['Operativo', 'Auditor / Lector', 'Contable', 'Pasante', 'Externo']) {
+    assert.deepEqual(nombresOrg({ ...ANA, role }), [], role);
+  }
+  for (const role of ROLES_ORGANIGRAMA) {
+    assert.deepEqual(nombresOrg({ ...ANA, role }).sort(),
+      ['buscar_puesto', 'estructura_organizacion', 'mi_equipo', 'mi_posicion_organigrama'], role);
+  }
+
+  preparar(t, { organizacion: 'lector' });
+  const org = t.mock.method(organizacionService, 'obtenerOrganigrama', async () => organigrama());
+  for (const role of ['Operativo', 'Auditor / Lector']) {
+    for (const n of ['mi_posicion_organigrama', 'mi_equipo']) {
+      const r = await ejecutar(n, {}, { ...ANA, role });
+      assert.equal(r.estado, 'DENEGADO', `${role} ${n}`);
+      assert.equal(r.motivo, 'SIN_PERMISO', `${role} ${n}`);
+    }
+  }
+  assert.equal(org.mock.callCount(), 0);
 });
 
 test('estructura_organizacion: requiere alcance global Y rol de Dirección', async (t) => {

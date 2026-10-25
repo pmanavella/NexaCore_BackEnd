@@ -3,8 +3,9 @@ const router  = express.Router()
 const ctrl    = require('../controllers/organizacionController')
 const { authenticate }  = require('../../middleware/authMiddleware')
 const { requireRole }   = require('../../middleware/rbacMiddleware')
+const { ROLES_ORGANIGRAMA } = require('../config/permisos')
 
-const soloAdmin      = requireRole('Dirección', 'Superadmin', 'Director')
+const soloAdmin      = requireRole(...ROLES_ORGANIGRAMA)
 const soloSuperadmin = requireRole('Superadmin')
 
 // Todas las rutas requieren autenticación

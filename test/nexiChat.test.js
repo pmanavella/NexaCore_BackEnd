@@ -16,7 +16,7 @@ const { crearGeminiProvider, _aContenidos } = require('../nexi/providers/geminiP
 const { crearLimitadorPorUsuario } = require('../nexi/middleware/rateLimit');
 const nexiErrorHandler = require('../nexi/middleware/nexiErrorHandler');
 const { construirInstruccionSistema } = require('../nexi/services/contextoService');
-const { LIMITES } = require('../nexi/config/nexi');
+const { LIMITES, MODULOS_CONTEXTO } = require('../nexi/config/nexi');
 
 const AHORA = new Date('2026-09-27T15:00:00Z');
 const USUARIO = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'ana@nexacore.test', name: 'Ana Pérez', role: 'Empleado' };
@@ -369,11 +369,82 @@ test('nexiPermisos.obtenerNiveles: usa el id de la sesión y resuelve niveles', 
     { permiso: 'editor', source: 'rol', modulos: { nombre: 'finance', label: 'Finanzas' } },
     { permiso: 'sin_acceso', source: 'ninguno', modulos: { nombre: 'crm', label: 'CRM' } },
   ]);
-  const niveles = await nexiPermisos.obtenerNiveles({ id: USUARIO.id, role: 'Superadmin' });
+  const niveles = await nexiPermisos.obtenerNiveles({ id: USUARIO.id, role: 'Dirección', hierarchyLevel: 'HIGH' });
   assert.equal(mock.mock.calls[0].arguments[0], USUARIO.id);
   assert.equal(niveles.get('finance').nivel, 'administrador');
+  assert.equal(niveles.get('finance').alcance, 'global');
   assert.equal(niveles.get('crm').nivel, 'sin_acceso');
   assert.equal((await nexiPermisos.obtenerNiveles({})).size, 0);
+});
+
+test('nexiPermisos.obtenerNiveles: Superadmin es administrador global en todos los módulos de Nexi, aun sin fila o con un permiso particular que lo restrinja', async (t) => {
+  t.mock.method(organizacionService, 'obtenerPermisosUsuario', async () => [
+    { permiso: 'sin_acceso', alcance: 'global', source: 'usuario', modulos: { nombre: 'finance', label: 'Finanzas' } },
+    { permiso: 'lector', alcance: 'propio', source: 'usuario', modulos: { nombre: 'protocolos', label: 'Protocolos' } },
+    { permiso: 'sin_acceso', alcance: null, source: 'ninguno', modulos: { nombre: 'crm', label: 'CRM' } },
+  ]);
+  const niveles = await nexiPermisos.obtenerNiveles({ id: USUARIO.id, role: 'Superadmin', hierarchyLevel: 'HIGH' });
+  for (const modulo of MODULOS_CONTEXTO) {
+    assert.equal(niveles.get(modulo).nivel, 'administrador', modulo);
+    assert.equal(niveles.get(modulo).alcance, 'global', modulo);
+  }
+  assert.equal(niveles.get('protocolos').label, 'Protocolos');
+
+  // Solo el rol Superadmin: Dirección con la misma matriz sigue acotada por la fila particular.
+  const direccion = await nexiPermisos.obtenerNiveles({ id: USUARIO.id, role: 'Dirección', hierarchyLevel: 'HIGH' });
+  assert.equal(direccion.get('finance').nivel, 'sin_acceso');
+  assert.equal(direccion.get('protocolos').alcance, 'propio');
+  assert.equal(direccion.get('crm').nivel, 'sin_acceso');
+});
+
+test('Superadmin en Nexi: las restricciones fijas se mantienen (sin herramientas de escritura ni de sueldos, identidad de la sesión, auditoría)', async (t) => {
+  t.mock.method(organizacionService, 'obtenerPermisosUsuario', async () => []);
+  const auditoria = t.mock.method(auditoriaService, 'registrar', async () => {});
+  const superadmin = { ...USUARIO, role: 'Superadmin', hierarchyLevel: 'HIGH' };
+  const ofrecidas = registry.herramientasDisponibles(await nexiPermisos.obtenerNiveles(superadmin), null, superadmin);
+  assert.ok(ofrecidas.length > 0);
+  assert.ok(ofrecidas.every(h => h.efecto === 'LECTURA' || h.efecto === 'GENERACION'));
+  assert.ok(!ofrecidas.some(h => /salari|sueldo|nomina|crear|editar|eliminar/.test(h.nombre)));
+
+  for (const nombre of ['crear_movimiento', 'salarios_empleados']) {
+    const r = await registry.ejecutar({ nombre, argumentos: {}, usuario: superadmin, conversacionId: CONV_ID });
+    assert.equal(r.estado, 'DENEGADO', nombre);
+    assert.equal(r.motivo, 'HERRAMIENTA_NO_REGISTRADA', nombre);
+  }
+  const otro = await registry.ejecutar({ nombre: 'mis_tareas_pendientes', argumentos: { usuario_id: 'otro' }, usuario: superadmin, conversacionId: CONV_ID });
+  assert.equal(otro.motivo, 'PARAMETRO_DE_IDENTIDAD');
+  assert.equal(auditoria.mock.callCount(), 3);
+});
+
+test('nexiPermisos.obtenerNiveles: RN-02 — Finanzas por rol no habilita a quien no es mando alto', async (t) => {
+  t.mock.method(organizacionService, 'obtenerPermisosUsuario', async () => [
+    { permiso: 'editor', alcance: 'global', source: 'rol', modulos: { nombre: 'finance', label: 'Finanzas' } },
+    { permiso: 'editor', alcance: 'global', source: 'rol', modulos: { nombre: 'dashboard', label: 'Dashboard' } },
+  ]);
+  const niveles = await nexiPermisos.obtenerNiveles({ id: USUARIO.id, role: 'Contable', hierarchyLevel: 'LOW' });
+  assert.equal(niveles.get('finance').nivel, 'sin_acceso');
+  assert.equal(niveles.get('finance').label, 'Finanzas');
+  // El resto de los módulos sigue resolviéndose igual (permiso de rol válido).
+  assert.equal(niveles.get('dashboard').nivel, 'editor');
+});
+
+test('nexiPermisos.obtenerNiveles: mando alto sin fila de Finanzas accede; con fila particular, la fila lo acota', async (t) => {
+  const mock = t.mock.method(organizacionService, 'obtenerPermisosUsuario', async () => []);
+  const sinFila = await nexiPermisos.obtenerNiveles({ id: USUARIO.id, role: 'Dirección', hierarchyLevel: 'HIGH' });
+  assert.deepEqual(sinFila.get('finance'), { nivel: 'administrador', label: 'Finanzas', alcance: 'global' });
+
+  // Opción (a): Nexi mantiene la restricción de la fila particular (la API REST deja pasar al mando alto).
+  mock.mock.mockImplementation(async () => [
+    { permiso: 'sin_acceso', alcance: 'global', source: 'usuario', modulos: { nombre: 'finance', label: 'Finanzas' } },
+  ]);
+  const restringido = await nexiPermisos.obtenerNiveles({ id: USUARIO.id, role: 'Dirección', hierarchyLevel: 'HIGH' });
+  assert.equal(restringido.get('finance').nivel, 'sin_acceso');
+
+  mock.mock.mockImplementation(async () => [
+    { permiso: 'lector', alcance: 'propio', source: 'usuario', modulos: { nombre: 'finance', label: 'Finanzas' } },
+  ]);
+  const propio = await nexiPermisos.obtenerNiveles({ id: USUARIO.id, role: 'Dirección', hierarchyLevel: 'HIGH' });
+  assert.deepEqual(propio.get('finance'), { nivel: 'lector', label: 'Finanzas', alcance: 'propio' });
 });
 
 // ── Proveedor Gemini ────────────────────────────────────────────────────────

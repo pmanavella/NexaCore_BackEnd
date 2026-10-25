@@ -55,6 +55,13 @@ function fraseVariacion(actual, anterior) {
   return `variaron ${f.variacion(variacionPct(actual, anterior))}`;
 }
 
+// Un balance que se muestra como $ 0,00 (incluidos restos de redondeo) no es
+// positivo ni negativo.
+function fraseBalance(balance) {
+  if (Math.round(balance * 100) === 0) return `El balance del período fue de ${f.moneda(0)}.`;
+  return `El balance del período fue ${balance > 0 ? 'positivo' : 'negativo'}: ${f.moneda(balance)}.`;
+}
+
 function notaParcial(periodo) {
   return periodo.en_curso ? [`El período está en curso: los datos llegan hasta el ${periodo.datos_hasta.split('-').reverse().join('/')} (parciales).`] : [];
 }
@@ -134,9 +141,7 @@ async function seccionFinanzas(ctx) {
   }
   if (kpi.filas?.length) tablas.push(tablaIndicadores('KPI financieros', kpi.filas));
 
-  const observaciones = [
-    `El balance del período fue ${actual.balance >= 0 ? 'positivo' : 'negativo'}: ${f.moneda(actual.balance)}.`,
-  ];
+  const observaciones = [fraseBalance(actual.balance)];
   if (anterior) {
     observaciones.push(`Frente a ${comp.etiqueta}, los ingresos ${fraseVariacion(actual.ingresos, anterior.ingresos)} y los gastos ${fraseVariacion(actual.gastos, anterior.gastos)}.`);
   }

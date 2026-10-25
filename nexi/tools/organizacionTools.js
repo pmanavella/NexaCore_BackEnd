@@ -1,5 +1,6 @@
 const nexiOrganigrama = require('../services/nexiOrganigrama');
 const { denegar } = require('./comunes');
+const { ROLES_ORGANIGRAMA } = require('../../organization/config/permisos');
 
 // Herramientas de Organización (solo lectura) sobre el organigrama real
 // (organizacionService.obtenerOrganigrama, vía nexiOrganigrama).
@@ -8,15 +9,15 @@ const { denegar } = require('./comunes');
 // sistema / empleado / externo / manual). Nunca emails, teléfonos, ids,
 // credenciales, roles de sistema ni permisos.
 //
-// Autorización (además del permiso de lectura sobre 'organizacion'):
+// Autorización: además del permiso de lectura sobre 'organizacion', TODAS las
+// herramientas exigen los mismos roles que GET /api/organizacion/organigrama
+// (organization/config/permisos.js), y cada una un alcance:
 //   - mi_posicion_organigrama: datos propios → cualquier alcance.
 //   - mi_equipo: reportes directos → alcance equipo_directo o mayor; la
 //     estructura completa a cargo → subarbol o global.
-//   - estructura_organizacion / buscar_puesto: toda la organización → alcance
-//     global y los mismos roles que GET /api/organizacion/organigrama
-//     (organization/routes/organizacion.js: Dirección, Superadmin, Director).
+//   - estructura_organizacion / buscar_puesto: toda la organización → alcance global.
 
-const ROLES_ORGANIGRAMA_COMPLETO = ['Dirección', 'Superadmin', 'Director'];
+const ROLES_ORGANIGRAMA_COMPLETO = ROLES_ORGANIGRAMA;
 const REQUISITOS = [{ modulo: 'organizacion', permiso: 'lector' }];
 const MAX_PERSONAS = 50;
 // Texto libre acotado (letras con tildes, números y puntuación básica).
@@ -41,6 +42,7 @@ const miPosicion = {
   descripcion: 'Posición del usuario que conversa dentro del organigrama: su cargo, área y nivel, quién es su responsable directo y cuántas personas le reportan directamente.',
   parametros: { type: 'object', properties: {}, additionalProperties: false },
   requisitos: REQUISITOS,
+  requisitosRol: ROLES_ORGANIGRAMA_COMPLETO,
   alcance: 'PERSONAL',
   alcancesPermitidos: ['propio', 'equipo_directo', 'subarbol', 'global'],
   async handler(args, { usuario }) {
@@ -70,6 +72,7 @@ const miEquipo = {
     additionalProperties: false,
   },
   requisitos: REQUISITOS,
+  requisitosRol: ROLES_ORGANIGRAMA_COMPLETO,
   alcance: 'PERSONAL',
   alcancesPermitidos: ['equipo_directo', 'subarbol', 'global'],
   async handler(args, { usuario, alcance }) {
