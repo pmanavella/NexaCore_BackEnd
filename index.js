@@ -4,6 +4,7 @@ const cors = require('cors');
 const cron = require('node-cron');
 const comprobantesService = require('./finance/services/comprobantesService');
 const errorHandler = require('./middleware/errorHandler');
+const { crearHealthCheck } = require('./utils/healthCheck');
 
 // Finance module
 const movimientosRoutes = require('./finance/routes/movimientos');
@@ -113,10 +114,8 @@ app.use('/api/indicadores', indicadoresRoutes);
 // ── Nexi ───────────────────────────────────────────────
 app.use('/api/nexi', nexiRoutes);
 
-// Health check (público — sin auth)
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', app: 'NexaCore', timestamp: new Date().toISOString() });
-});
+// Health check (público, sin auth): consulta Supabase e informa la versión desplegada.
+app.get('/api/health', crearHealthCheck({ supabase: require('./config/supabase') }));
 
 app.use(errorHandler);
 

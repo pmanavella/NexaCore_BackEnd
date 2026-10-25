@@ -162,3 +162,68 @@ jobs:
               echo '```'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+  despliegue:
+    name: Despliegue de prueba y smoke (nexacore-test)
+    needs: [compilacion, pruebas, integracion]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # La instancia se despliega dentro del runner, apuntada solo a nexacore-test.
+      SUPABASE_TEST_URL: ${{ secrets.SUPABASE_TEST_URL }}
+      SUPABASE_TEST_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_TEST_SERVICE_ROLE_KEY }}
+      SUPABASE_TEST_ANON_KEY: ${{ secrets.SUPABASE_TEST_ANON_KEY }}
+      TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Construir la imagen de esta versión
+        run: docker build --build-arg APP_VERSION=${{ github.sha }} -t nexacore-backend:${{ github.sha }} .
+
+      - name: Desplegar la instancia de prueba
+        run: |
+          docker run -d --name nexacore-backend -p 3001:3001 \
+            -e SUPABASE_URL="$SUPABASE_TEST_URL" \
+            -e SUPABASE_SERVICE_KEY="$SUPABASE_TEST_SERVICE_ROLE_KEY" \
+            -e DB_LABEL=nexacore-test \
+            nexacore-backend:${{ github.sha }}
+          for intento in $(seq 1 30); do
+            curl -s -o /dev/null http://localhost:3001/api/health && break
+            sleep 2
+          done
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Smoke test contra la instancia desplegada
+        shell: bash
+        env:
+          SMOKE_BASE_URL: http://localhost:3001
+          EXPECTED_VERSION: ${{ github.sha }}
+        run: npm run test:smoke 2>&1 | tee resultado-smoke.txt
+
+      - name: Reporte en el resumen de la ejecución
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Smoke posterior al despliegue (versión \`${GITHUB_SHA::7}\`)"
+            echo '```'
+            grep -E '^(✔|✖|﹣)|^ℹ (tests|pass|fail|skipped)' resultado-smoke.txt || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Registro de la instancia (solo si falla)
+        if: failure()
+        run: docker logs nexacore-backend
+
+      - name: Apagar la instancia
+        if: always()
+        run: docker rm -f nexacore-backend
