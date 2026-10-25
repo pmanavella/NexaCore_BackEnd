@@ -1,6 +1,6 @@
 # Herramienta nueva: k6 para stress y esfuerzo sostenido
 
-**Responsable:** Valentina · **Versión:** 1.0 (borrador) · **Consigna:** "Herramienta nueva incorporada con el proceso de cinco pasos: requisitos, mercado, prueba de concepto, matriz de decisión y despliegue incremental".
+**Responsable:** Valentina · **Versión:** 1.0 · **Consigna:** "Herramienta nueva incorporada con el proceso de cinco pasos: requisitos, mercado, prueba de concepto, matriz de decisión y despliegue incremental".
 
 **Resultado:** se incorporó k6, que obtuvo el mayor puntaje de la matriz ponderada (4,80 sobre 5) frente a Artillery (3,95), Gatling (3,50), Locust (3,05) y JMeter (2,45). Corre en un job separado del pipeline (`.github/workflows/rendimiento.yml`), contra una instancia del backend apuntada a nexacore-test, con umbrales fijados antes de ejecutar.
 
@@ -51,19 +51,19 @@ Se relevaron cinco herramientas de código abierto de uso extendido para pruebas
 4. Corre dentro de GitHub Actions contra la instancia desplegada en el runner y deja el reporte como artefacto (RQ-2).
 5. La carga se puede fijar en peticiones por segundo, con un tope (RQ-8).
 
-**Ejecución y resultado:**
+**Ejecución y resultado** (corrida corta del 25/10, Rendimiento #1: escalones de 30 s y 3 min de esfuerzo sostenido):
 
 | Criterio | Evidencia | Resultado |
 |---|---|---|
-| 1. Instalación | `brew install k6` → k6 v2.3.0, un solo binario, sin dependencias | Cumple · *[EV a asignar: captura de la terminal]* |
-| 2. Script con sesión y rutas reales | `k6/lib/comun.js`: inicia sesión con dos usuarios del seed (U-02 y U-10) y consulta health, movimientos, métricas y flujo; `k6 inspect` lee los dos scripts sin errores | *[a completar con la salida de `k6 inspect`]* |
-| 3. Umbrales que deciden | `k6/sostenido.js` declara `thresholds`; `k6/stress.js` aborta si los errores superan el 10 % | *[a completar con la primera corrida]* |
-| 4. Ejecución en Actions | Job "Stress y esfuerzo sostenido (k6, nexacore-test)", con reporte en el *Summary* y artefacto `resultados-k6-<commit>` | *[a completar: EV-66a]* |
+| 1. Instalación | `brew install k6` → k6 v2.3.0, un solo binario, sin dependencias | Cumple |
+| 2. Script con sesión y rutas reales | `k6/lib/comun.js`: inicia sesión con dos usuarios del seed (U-02 y U-10) y consulta health, movimientos, métricas y flujo; `k6 inspect` lee los dos scripts sin errores (script de instalación, 25/10) | Cumple: 0 % de errores en 543 peticiones del sostenido corto (EV-66a) |
+| 3. Umbrales que deciden | `k6/sostenido.js` declara `thresholds` por endpoint | Cumple: en la corrida corta el p95 de `/movimientos` dio 1530 ms (umbral 1500) y k6 terminó con error, marcando el job en rojo (Rendimiento #1, EV-66a) |
+| 4. Ejecución en Actions | Job "Stress y esfuerzo sostenido (k6, nexacore-test)", con reporte en el *Summary* y artefacto `resultados-k6-<commit>` | Cumple: corrida corta del 25/10 (etiqueta `rendimiento-demo`, 6 min 41 s), con las dos tablas en el resumen (EV-66a, EV-66b) |
 | 5. Carga acotada | Ejecutor `constant-arrival-rate`: tasa fija por escalón, tope de 30 peticiones por segundo | Cumple por diseño (`k6/stress.js`) |
 
 ## Paso 4 · Matriz de decisión ponderada
 
-**Pesos.** Se fijan antes de puntuar, igual que los umbrales de rendimiento. Siguen la prioridad de los requisitos: los obligatorios pesan más que los deseables. *[Pendiente: aprobación del grupo antes de dar la matriz por cerrada.]*
+**Pesos.** Se fijan antes de puntuar, igual que los umbrales de rendimiento. Siguen la prioridad de los requisitos: los obligatorios pesan más que los deseables. Propuestos por Valentina el 24/10, antes de puntuar.
 
 **Escala:** 1 (no lo resuelve o exige mucho trabajo extra) a 5 (lo resuelve de forma nativa).
 
@@ -126,7 +126,41 @@ Los percentiles se evalúan por endpoint (`/movimientos`, `/movimientos/metricas
 
 En el stress, un escalón cumple solo si los tres endpoints están bajo el umbral, no hay más de 1 % de errores y k6 no descartó iteraciones.
 
-Aprobación del grupo: *[EV-65]*.
+Aprobación del grupo: EV-65.
+
+## Resultados (corrida completa del 25/10, Rendimiento #2)
+
+**El backend no se satura hasta 30 peticiones por segundo ni se degrada en 15 minutos, pero `/movimientos/flujo` supera el umbral de latencia en todas las cargas.** Evidencias: EV-66c (esfuerzo sostenido) y EV-66d (stress).
+
+**Stress** (escalones de 90 s):
+
+| Escalón | Usuarios virtuales (máx.) | p95 /movimientos | p95 /metricas | p95 /flujo | Errores | Descartadas | Cumple |
+|---|---|---|---|---|---|---|---|
+| 2 pet/s | 5 | 1836 ms | 1901 ms | 2608 ms | 0 % | 0 | No |
+| 5 pet/s | 10 | 1486 ms | 1666 ms | 2609 ms | 0 % | 0 | No |
+| 10 pet/s | 17 | 1491 ms | 1506 ms | 2588 ms | 0 % | 0 | No |
+| 20 pet/s | 35 | 1481 ms | 1495 ms | 2643 ms | 0 % | 0 | No |
+| 30 pet/s | 46 | 1478 ms | 1493 ms | 2540 ms | 0 % | 0 | No |
+
+**Esfuerzo sostenido** (3 pet/s durante 15 min, 2704 peticiones, hasta 8 usuarios virtuales):
+
+| Criterio | Umbral | Resultado | Cumple |
+|---|---|---|---|
+| p95 /movimientos | < 1500 ms | 1490 ms | Sí |
+| p95 /movimientos/metricas | < 1500 ms | 1530 ms | No |
+| p95 /movimientos/flujo | < 1500 ms | 2577 ms | No |
+| p99 de los tres endpoints | < 3000 ms | 1749, 1824 y 2821 ms | Sí |
+| Respuestas fallidas y errores funcionales | < 1 % | 0 % | Sí |
+| Iteraciones descartadas | 0 | 0 | Sí |
+| Degradación (p95 final frente al inicial) | ≤ 25 % | −0,5 % (2483 → 2470 ms) | Sí |
+
+**Conclusiones:**
+
+- **Capacidad:** hasta 30 pet/s no hay errores ni iteraciones descartadas, y la latencia no crece con la carga. El sistema no llegó a saturarse dentro del tope que permite el plan gratuito de Supabase.
+- **Estabilidad:** en 15 minutos la latencia del final es igual a la del inicio.
+- **Latencia de base:** los escalones bajos son los más lentos por el calentamiento. Después, la latencia queda en unos 1,5 s para `/movimientos` y `/metricas`, y en unos 2,6 s para `/flujo`: tres llamadas a Supabase en serie desde otra región, más el cálculo propio de `/flujo` sin paginación (H-54, H-55).
+- **Umbrales:** el de 1,5 s se fijó tomando como referencia el health, sin medir antes la línea base de cada endpoint. No se modificó después de ver los resultados: se informa como no cumplido en `/flujo` y `/metricas`.
+- **La herramienta:** k6 detectó el incumplimiento y marcó el job en rojo, como estaba previsto. Evaluar por endpoint fue decisivo: con el p95 general, el health habría tapado a `/flujo`.
 
 ## Cómo se ejecuta
 
