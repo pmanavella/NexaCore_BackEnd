@@ -16,6 +16,7 @@ H-01 a H-47 surgen de la lectura del código (17 y 18/10/2026); los posteriores 
 | H-08 | El backend declara Node 18, pero supabase-js requiere Node 20 o superior | Smoke tras actualizar |
 | H-09 | Sin análisis estático, linter ni cobertura; el frontend no tiene CI | — |
 | H-48 | `npm audit` informa 10 vulnerabilidades en dependencias del backend (1 crítica y 7 altas), entre ellas `xlsx`, que usa la importación por Excel. Riesgo de dependencias, no defecto del módulo. Detectado por Victoria (19/10) | — (se verifica con `npm audit`) |
+| H-52 | SonarQube Cloud, en el plan gratuito, no analiza pull requests: el análisis y el quality gate corren solo en el push a develop. Un cambio puede pasar todos los checks del pull request y recién fallar el quality gate cuando ya está en develop. Detectado por Valentina al configurar el pipeline; mitigación: el job de SonarQube corre en cada push a develop y su resultado se revisa después de cada merge | — |
 
 ## Validación de movimientos
 
@@ -56,11 +57,8 @@ H-01 a H-47 surgen de la lectura del código (17 y 18/10/2026); los posteriores 
 | ID | Hallazgo | Casos |
 |---|---|---|
 | H-23 | `dias=0` se trata como 7; moneda y frecuencia inválidas se reemplazan en silencio; un pago se reconoce por coincidencias de texto. Moneda y frecuencia inválidas confirmadas como DEF-016 (#34) por CP-FIN-07-01 a 07-04; corregido en 5e1d73d.| CP-FIN-08-06, CP-FIN-07-01 a 07-04 |
+| H-50 | H-50: número no asignado. La numeración pasa de H-49 a H-51; no se renumera para no cambiar las referencias existentes | — |
 | H-51 | `datos-de-prueba.md` v1.1 definía S-06 con estado "Inactiva", que no pertenece al dominio del esquema (`activa`, `pausada`, `cancelada`). Hallazgo de documentación (verificación estática), no defecto del módulo. Detectado por Valentina al implementar el seed de nexacore-test (22/10, commit b20a93b); confirmado y corregido en la v1.2 (23/10) | CP-FIN-08-08 |
-| H-52 | SonarQube Cloud, en el plan gratuito, no analiza pull requests: el análisis y el quality gate corren solo en el push a develop. Un cambio puede pasar todos los checks del pull request y recién fallar el quality gate cuando ya está en develop. Detectado por Valentina al configurar el pipeline; mitigación: el job de SonarQube corre en cada push a develop y su resultado se revisa después de cada merge | — |
-| H-53 | El helper `pedir()` de 8 archivos de test levanta Express con `listen(0)`, que escucha en todas las direcciones, y después se conecta a `127.0.0.1`. En macOS, si otro proceso ya escucha en `127.0.0.1` en el puerto asignado (en el caso detectado, procesos de VS Code y de la extensión de SonarQube), la petición le llega a ese proceso y el test falla con `HTTPParserError`, porque recibe HTTP/2. Falla intermitente solo en máquinas locales (`npm test` del 25/10: 992 de 997, falla CP-FIN-02-01); en el pipeline no ocurre porque el runner no tiene otros procesos escuchando. No es un defecto del módulo. Corrección propuesta: `listen(0, '127.0.0.1')`. Detectado por Valentina (25/10) | CP-FIN-02-01 |
-| H-54 | `GET /api/finance/movimientos` devuelve la tabla completa, sin paginación ni límite. Con los datos del seed es chica, pero con datos reales la latencia y el tamaño de la respuesta crecerían con la cantidad de movimientos. Detectado por Valentina al diseñar las pruebas de carga (24/10) | — |
-| H-55 | `GET /api/finance/movimientos/flujo` supera el umbral de rendimiento (p95 < 1500 ms) en todas las cargas: 2540 a 2643 ms en el stress de 2 a 30 pet/s y 2577 ms en el esfuerzo sostenido de 15 min. Su latencia no crece con la carga y no hay errores, así que no es saturación sino el costo propio del endpoint (calcula el flujo sobre todos los movimientos, sin paginación: H-54). `/metricas` queda apenas por encima en el esfuerzo sostenido (1530 ms). La latencia de base de las rutas de Finanzas medida desde GitHub Actions ronda 1,5 s: tres llamadas en serie a Supabase, en otra región. Detectado por Valentina con k6 (25/10, Rendimiento #2; EV-66c, EV-66d) | — |
 
 ## Permisos
 
@@ -95,11 +93,19 @@ H-01 a H-47 surgen de la lectura del código (17 y 18/10/2026); los posteriores 
 | H-44 | Logs solo en consola, sin ruta, usuario ni hora; los procesos programados no registran su resultado ni reintentan; no hay `HEALTHCHECK` | — |
 | H-45 | Al crear un gasto con una suscripción nueva, si falla el segundo paso la suscripción queda creada y reintentar la duplica | — |
 
+## Rendimiento
+
+| ID | Hallazgo | Casos |
+|---|---|---|
+| H-54 | `GET /api/finance/movimientos` devuelve la tabla completa, sin paginación ni límite. Con los datos del seed es chica, pero con datos reales la latencia y el tamaño de la respuesta crecerían con la cantidad de movimientos. Detectado por Valentina al diseñar las pruebas de carga (24/10) | — |
+| H-55 | `GET /api/finance/movimientos/flujo` supera el umbral de rendimiento (p95 < 1500 ms) en todas las cargas: 2540 a 2643 ms en el stress de 2 a 30 pet/s y 2577 ms en el esfuerzo sostenido de 15 min. Su latencia no crece con la carga y no hay errores, así que no es saturación sino el costo propio del endpoint (calcula el flujo sobre todos los movimientos, sin paginación: H-54). `/metricas` queda apenas por encima en el esfuerzo sostenido (1530 ms). La latencia de base de las rutas de Finanzas medida desde GitHub Actions ronda 1,5 s: tres llamadas en serie a Supabase, en otra región. Detectado por Valentina con k6 (25/10, Rendimiento #2; EV-66c, EV-66d) | — |
+
 ## Tests del equipo
 
 | ID | Hallazgo | Casos |
 |---|---|---|
 | H-46 | 4 de los 8 tests de `documentExtraction.test.js` fallaban en `develop` desde el commit `1f04ba4` (14/09), sin que nadie lo notara durante un mes porque los tests no se ejecutaban en ningún pipeline. No era un defecto del código: los tests quedaron desactualizados por dos cambios de regla intencionales (renglones netos contra subtotal; categoría inválida como advertencia). Se actualizaron con el pull request #29 (commit 85f7590), mergeado a develop el 18/10 (d443536), antes de la línea base (8 de 8 en verde). El merge se hizo sin la revisión de otra integrante que exige el plan de pruebas; la revisión queda pendiente | — |
+| H-53 | El helper `pedir()` de 8 archivos de test levanta Express con `listen(0)`, que escucha en todas las direcciones, y después se conecta a `127.0.0.1`. En macOS, si otro proceso ya escucha en `127.0.0.1` en el puerto asignado (en el caso detectado, procesos de VS Code y de la extensión de SonarQube), la petición le llega a ese proceso y el test falla con `HTTPParserError`, porque recibe HTTP/2. Falla intermitente solo en máquinas locales (`npm test` del 25/10: 992 de 997, falla CP-FIN-02-01); en el pipeline no ocurre porque el runner no tiene otros procesos escuchando. No es un defecto del módulo. Corrección propuesta: `listen(0, '127.0.0.1')`. Detectado por Valentina (25/10) | CP-FIN-02-01 |
 
 ## Nota sobre la cotización del dólar (H-24)
 
