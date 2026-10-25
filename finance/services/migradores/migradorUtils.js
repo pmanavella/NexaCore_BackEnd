@@ -1,6 +1,7 @@
 const XLSX = require('xlsx');
 
-const CATEGORIAS_VALIDAS = ['Tecnología', 'RRHH', 'Insumos', 'Servicios', 'Inversión', 'Otros', 'Suscripción'];
+const { CATEGORIAS_VALIDAS } = require('../../config/movimientos');
+const { parsearFecha } = require('../../utils/fechas');
 
 // Mapeo flexible concepto → categoría del sistema
 const CONCEPTO_A_CATEGORIA = {
@@ -11,23 +12,6 @@ const CONCEPTO_A_CATEGORIA = {
   'inversion': 'Inversión', 'inversión': 'Inversión', 'compra': 'Inversión', 'compras': 'Inversión', 'importacion': 'Inversión', 'importación': 'Inversión',
   'suscripcion': 'Suscripción', 'suscripción': 'Suscripción', 'subscripcion': 'Suscripción', 'licencia': 'Suscripción',
 };
-
-function parsearFecha(valor) {
-  if (!valor) return null;
-  if (typeof valor === 'number') {
-    const date = new Date((valor - 25569) * 86400 * 1000);
-    return date.toISOString().split('T')[0];
-  }
-  const str = String(valor).trim();
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
-    const [d, m, y] = str.split('/');
-    return `${y}-${m}-${d}`;
-  }
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
-  const parsed = new Date(str);
-  if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
-  return null;
-}
 
 function mapearCategoria(concepto) {
   if (!concepto) return 'Otros';

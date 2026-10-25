@@ -2,24 +2,24 @@ const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/migracionController');
 const { authenticate } = require('../../middleware/authMiddleware');
-const { requireRole } = require('../../middleware/rbacMiddleware');
+const { consultaFinanzas, cargaFinanzas, soloMandoAlto } = require('../config/permisos');
 
 router.use(authenticate);
 
-// Tipos disponibles de migración — accesible para todos los usuarios autenticados
-router.get('/tipos', ctrl.listarTipos.bind(ctrl));
+// Tipos disponibles de migración — consulta de Finanzas
+router.get('/tipos', consultaFinanzas, ctrl.listarTipos.bind(ctrl));
 
-// Preview (sin escritura en DB) — accesible para todos los autenticados
-router.post('/preview', ctrl.uploadMiddleware, ctrl.preview.bind(ctrl));
+// Preview (sin escritura en DB) — carga de Finanzas
+router.post('/preview', cargaFinanzas, ctrl.uploadMiddleware, ctrl.preview.bind(ctrl));
 
-// Confirmación (escribe en DB) — solo Admin y Superadmin
-router.post('/confirmar', requireRole('Admin', 'Superadmin'), ctrl.uploadMiddleware, ctrl.confirmar.bind(ctrl));
+// Confirmación (escribe en DB) — solo mando alto
+router.post('/confirmar', soloMandoAlto, ctrl.uploadMiddleware, ctrl.confirmar.bind(ctrl));
 
-// Auditoría de batches
-router.get('/batches', ctrl.listarBatches.bind(ctrl));
-router.get('/batches/:id', ctrl.obtenerBatch.bind(ctrl));
+// Auditoría de batches — consulta de Finanzas
+router.get('/batches', consultaFinanzas, ctrl.listarBatches.bind(ctrl));
+router.get('/batches/:id', consultaFinanzas, ctrl.obtenerBatch.bind(ctrl));
 
-// Reversión — solo Admin y Superadmin
-router.post('/batches/:id/revertir', requireRole('Admin', 'Superadmin'), ctrl.revertirBatch.bind(ctrl));
+// Reversión — solo mando alto
+router.post('/batches/:id/revertir', soloMandoAlto, ctrl.revertirBatch.bind(ctrl));
 
 module.exports = router;

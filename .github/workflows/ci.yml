@@ -1,0 +1,229 @@
+# Pipeline de calidad del backend (TP Integrador de Calidad de Software).
+# Corre en cada pull request a develop y en cada push a develop.
+# Etapas: compilación (imagen Docker) → pruebas + cobertura → análisis estático + quality gate.
+# No publica nada: la publicación de la imagen sigue en docker-publish.yml y solo corre en main.
+name: CI
+
+on:
+  pull_request:
+    branches: [develop]
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compilacion:
+    name: Compilación (imagen Docker)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Construir la imagen (sin publicar)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: nexacore-backend:ci
+
+  pruebas:
+    name: Pruebas y cobertura
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_ENV: test
+      # Valores ficticios: las pruebas de este job usan dobles de prueba y nunca
+      # se conectan a una base real. Las pruebas contra nexacore-test van en otro job.
+      SUPABASE_URL: http://127.0.0.1:54321
+      SUPABASE_SERVICE_KEY: clave-ficticia-ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Pruebas con cobertura (sentencia y decisión, lcov)
+        shell: bash
+        run: npm run test:coverage 2>&1 | tee resultado-pruebas.txt
+
+      - name: Reporte en el resumen de la ejecución
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Pruebas del backend"
+            echo '```'
+            grep -E '^ℹ (tests|pass|fail|cancelled|skipped)' resultado-pruebas.txt || true
+            echo '```'
+            echo "## Cobertura del módulo Financiero (Node, archivos cargados por los tests)"
+            echo '```'
+            sed -n '/start of coverage report/,/end of coverage report/p' resultado-pruebas.txt | sed 's/^ℹ //' || true
+            echo '```'
+            echo "La cifra oficial de cobertura es la de SonarQube (job de análisis estático)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Guardar reportes como artefacto
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-pruebas-y-cobertura
+          path: |
+            resultado-pruebas.txt
+            coverage/lcov.info
+          if-no-files-found: warn
+          retention-days: 30
+
+  calidad:
+    name: Análisis estático y quality gate
+    needs: pruebas
+    # El plan gratuito de SonarQube Cloud solo analiza la rama principal (develop):
+    # en un PR el gate aprobaba sin analizar código (EV-31). Se ejecuta solo en push.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout (historial completo, lo necesita SonarQube)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Descargar el reporte de cobertura
+        uses: actions/download-artifact@v4
+        with:
+          name: reporte-pruebas-y-cobertura
+
+      - name: SonarQube Cloud con quality gate
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: >
+          npx --yes @sonar/scan@4.4.0
+          -Dsonar.projectVersion=post-linea-base
+          -Dsonar.qualitygate.wait=true
+
+  integracion:
+    name: Integración con Supabase (nexacore-test)
+    needs: pruebas
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Solo la base de pruebas nexacore-test; las credenciales son secretos del repositorio.
+      SUPABASE_TEST_URL: ${{ secrets.SUPABASE_TEST_URL }}
+      SUPABASE_TEST_ANON_KEY: ${{ secrets.SUPABASE_TEST_ANON_KEY }}
+      SUPABASE_TEST_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_TEST_SERVICE_ROLE_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Pruebas de integración contra nexacore-test
+        shell: bash
+        run: npm run test:integracion 2>&1 | tee resultado-integracion.txt
+
+      - name: Reporte en el resumen de la ejecución
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Integración con Supabase (nexacore-test)"
+            echo '```'
+            grep -E '^ℹ (tests|pass|fail|skipped)' resultado-integracion.txt || true
+            echo '```'
+            if grep -q '^✖' resultado-integracion.txt; then
+              echo "### Pruebas fallidas"
+              echo '```'
+              grep -E '^✖' resultado-integracion.txt | sort -u || true
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  despliegue:
+    name: Despliegue de prueba y smoke (nexacore-test)
+    needs: [compilacion, pruebas, integracion]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # La instancia se despliega dentro del runner, apuntada solo a nexacore-test.
+      SUPABASE_TEST_URL: ${{ secrets.SUPABASE_TEST_URL }}
+      SUPABASE_TEST_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_TEST_SERVICE_ROLE_KEY }}
+      SUPABASE_TEST_ANON_KEY: ${{ secrets.SUPABASE_TEST_ANON_KEY }}
+      TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Construir la imagen de esta versión
+        run: docker build --build-arg APP_VERSION=${{ github.sha }} -t nexacore-backend:${{ github.sha }} .
+
+      - name: Desplegar la instancia de prueba
+        run: |
+          docker run -d --name nexacore-backend -p 3001:3001 \
+            -e SUPABASE_URL="$SUPABASE_TEST_URL" \
+            -e SUPABASE_SERVICE_KEY="$SUPABASE_TEST_SERVICE_ROLE_KEY" \
+            -e DB_LABEL=nexacore-test \
+            nexacore-backend:${{ github.sha }}
+          for intento in $(seq 1 30); do
+            curl -s -o /dev/null http://localhost:3001/api/health && break
+            sleep 2
+          done
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Smoke test contra la instancia desplegada
+        shell: bash
+        env:
+          SMOKE_BASE_URL: http://localhost:3001
+          EXPECTED_VERSION: ${{ github.sha }}
+        run: npm run test:smoke 2>&1 | tee resultado-smoke.txt
+
+      - name: Reporte en el resumen de la ejecución
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Smoke posterior al despliegue (versión \`${GITHUB_SHA::7}\`)"
+            echo '```'
+            grep -E '^(✔|✖|﹣)|^ℹ (tests|pass|fail|skipped)' resultado-smoke.txt || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Registro de la instancia (solo si falla)
+        if: failure()
+        run: docker logs nexacore-backend
+
+      - name: Apagar la instancia
+        if: always()
+        run: docker rm -f nexacore-backend

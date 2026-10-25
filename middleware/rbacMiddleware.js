@@ -61,14 +61,16 @@ function resolverNivelPermiso(permiso, rol) {
 // requireModulePermission debe usarse DESPUÉS de authenticate.
 // Igual que requireModuleAccess, consulta la Matriz de permisos real, pero exige
 // un nivel mínimo ('lector' | 'editor' | 'administrador').
-function requireModulePermission(moduloNombre, nivelMinimo, moduloLabel = moduloNombre) {
+// Con { soloPermisoUsuario: true } ignora el permiso que viene del rol
+// (rol_modulo_permisos) y solo cuenta el asignado al usuario en particular.
+function requireModulePermission(moduloNombre, nivelMinimo, moduloLabel = moduloNombre, { soloPermisoUsuario = false } = {}) {
   const minimo = NIVELES_PERMISO.indexOf(nivelMinimo);
   if (minimo <= 0) throw new Error(`Nivel de permiso inválido: ${nivelMinimo}`);
 
   return async (req, res, next) => {
     try {
       const permisos = req.user?.id ? await organizacionService.obtenerPermisosUsuario(req.user.id) : [];
-      const permiso = permisos.find(p => p.modulos?.nombre === moduloNombre);
+      const permiso = permisos.find(p => p.modulos?.nombre === moduloNombre && (!soloPermisoUsuario || p.source === 'usuario'));
       const nivel = resolverNivelPermiso(permiso, req.user?.role);
       if (NIVELES_PERMISO.indexOf(nivel) < minimo) {
         return res.status(403).json({ error: `No tiene permisos suficientes en el módulo ${moduloLabel}.` });
@@ -80,4 +82,19 @@ function requireModulePermission(moduloNombre, nivelMinimo, moduloLabel = modulo
   };
 }
 
-module.exports = { requireRole, requireHierarchy, requireModuleAccess, requireModulePermission, resolverNivelPermiso };
+// requireHierarchyOrModulePermission debe usarse DESPUÉS de authenticate.
+// Deja pasar a los niveles jerárquicos indicados sin consultar la Matriz; al resto
+// le exige el permiso de módulo, igual que requireModulePermission (acepta sus mismas opciones).
+// Ej: requireHierarchyOrModulePermission([NIVELES_JERARQUICOS.HIGH], 'finance', 'editor', 'Finanzas').
+function requireHierarchyOrModulePermission(allowedLevels, moduloNombre, nivelMinimo, moduloLabel = moduloNombre, opciones = {}) {
+  const porPermiso = requireModulePermission(moduloNombre, nivelMinimo, moduloLabel, opciones);
+  return (req, res, next) => {
+    if (allowedLevels.includes(req.user?.hierarchyLevel)) return next();
+    return porPermiso(req, res, next);
+  };
+}
+
+module.exports = {
+  requireRole, requireHierarchy, requireModuleAccess, requireModulePermission,
+  requireHierarchyOrModulePermission, resolverNivelPermiso,
+};

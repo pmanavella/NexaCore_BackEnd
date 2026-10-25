@@ -25,6 +25,7 @@ function fakeFrom(handler, llamadas = []) {
   };
 }
 const op = (st, nombre) => st.ops.find(o => o[0] === nombre);
+const TABLERO = '00000000-0000-4000-8000-000000000001';
 
 // F–K: las 6 combinaciones de "Configurar etapas"
 const COMBINACIONES = [
@@ -83,12 +84,13 @@ test('crearTarea en etapa En Revisión guarda el estado canónico permitido por 
     let insertado = null;
     t.mock.method(supabase, 'from', fakeFrom((st) => {
       if (st.table === 'operativo_etapas') return { data: [{ id: 'e-rev', tipo_base }], error: null };
+      if (st.table === 'operativo_tableros') return { data: { id: TABLERO, nombre: 'General' }, error: null };
       if (st.table === 'tareas' && op(st, 'insert')) { insertado = op(st, 'insert')[1][0]; return { data: { id: 't1', ...insertado }, error: null }; }
       // crearTarea relee la tarea creada (con etapa y asignados) para responder
       if (st.table === 'tareas') return { data: { id: 't1', ...insertado, tarea_asignados: [] }, error: null };
       return { data: null, error: null };
     }));
-    await operationsService.crearTarea({ titulo: 'Tarea', etapa_id: 'e-rev' });
+    await operationsService.crearTarea({ titulo: 'Tarea', etapa_id: 'e-rev', tablero_id: TABLERO }, { id: 'u1', hierarchyLevel: 'HIGH' });
     assert.equal(insertado.estado, estadoEsperado, tipo_base);
     // En Revisión no completa fechas reales automáticamente
     assert.equal(insertado.fecha_inicio_real, undefined);

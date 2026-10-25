@@ -34,7 +34,8 @@ const eliminar = async (req, res, next) => {
 
 const proximasVencer = async (req, res, next) => {
   try {
-    const dias = parseInt(req.query.dias) || 7;
+    const diasPedidos = Number.parseInt(req.query.dias, 10);
+    const dias = Number.isNaN(diasPedidos) ? 7 : diasPedidos;
     const data = await suscripcionesService.proximasVencer(dias);
     res.json({ data });
   } catch (err) { next(err); }

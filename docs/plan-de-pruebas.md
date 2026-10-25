@@ -8,8 +8,9 @@ Responsable: Pilar · Participan: Victoria y Valentina
 | Versión | Fecha | Tag de git | Cambios |
 |---|---|---|---|
 | 1.0 | 17/10/2026 | `plan-pruebas-v1.0` | Versión inicial: alcance, estrategia, criterios, entornos y verificación del despliegue |
+| 1.1 | 25/10/2026 | `plan-pruebas-v1.1` | Estado final de los criterios de salida (8.1) y matriz ISO/IEC 25010 con las 8 características y el top 3 (sección 15) |
 
-Cada versión se publica con un tag de git. Las versiones siguientes incorporan la matriz ISO/IEC 25010, los casos diseñados y la línea base medida.
+Cada versión se publica con un tag de git. La v1.1 incorpora la matriz ISO/IEC 25010 (sección 15) y el estado final de los criterios de salida (sección 8.1).
 
 ## 1. Objetivo
 
@@ -125,6 +126,20 @@ Las pruebas se consideran terminadas, a más tardar el 23 de octubre (congelamie
 8. La matriz de trazabilidad está completa: cada requisito tiene casos, y cada defecto, su caso y su estado.
 9. Hay al menos una ejecución del pipeline en verde y una fallida por un defecto real.
 
+### 8.1. Estado final (25/10/2026)
+
+| Criterio | Estado | Evidencia |
+|---|---|---|
+| 1. Casos de prioridad alta ejecutados y al menos el 80 % de los de prioridad media | No cumplido | Tienen ejecución registrada 61 de 76 de prioridad alta (80 %) y 34 de 49 de media (69 %). Faltan 12 casos de alta de nivel sistema (interfaz), que dependían de Cypress, y 3 de integración (CP-FIN-03-07, 04-02 y 04-06) |
+| 2. Sin defectos críticos abiertos | Cumplido | Los 5 críticos (DEF-001, 005, 006, 010 y 018) están corregidos, integrados en develop y verificados; la migración de DEF-018 se aplicó en Developer y en producción (EV-62, EV-69a a EV-69c) |
+| 3. Defectos altos abiertos documentados | Cumplido | No hay defectos altos abiertos; el único abierto, DEF-019, es de severidad media y está justificado (issue #44, `docs/trazabilidad.md`) |
+| 4. Regresión en verde para cada defecto corregido | Cumplido | 997 pruebas sin fallos en develop (EV-67a); la regresión de DEF-013 corre en local (EV-52c), porque el frontend no tiene pipeline |
+| 5. Cobertura del backend del módulo ≥ 80 % | Cumplido | 88,1 % en develop (sentencia 91,5 %, decisión 76,6 %; EV-58) |
+| 6. Quality gate en ambos repositorios | Parcial | Backend Passed en develop (EV-58); el frontend no tiene análisis posterior a la línea base |
+| 7. Stress y esfuerzo sostenido comparados con los umbrales | Cumplido | Ejecutados el 25/10 con umbrales fijados antes (EV-65, EV-66c, EV-66d); los umbrales de latencia no se cumplen en `/movimientos/flujo` ni en `/movimientos/metricas` |
+| 8. Trazabilidad completa | Cumplido con atraso | Cerrada el 25/10 (pull request #51), dos días después del congelamiento previsto |
+| 9. Pipeline en verde y ejecución fallida por un defecto real | Cumplido | Fallida en el #41 (EV-46a, EV-60a) y verde en el #43 (EV-48a) y en develop (EV-67a); también rojo y verde de DEF-018 en el #40 (EV-42a, EV-45a) |
+
 ## 9. Suspensión y reanudación
 
 | Se suspende cuando… | Se reanuda cuando… |
@@ -186,8 +201,33 @@ Estos datos alimentan la métrica de proceso (tiempo entre detección y correcci
 | Matriz de riesgos | `docs/matriz-riesgos.md` |
 | Casos de prueba | `docs/casos/` |
 | Matriz de trazabilidad | `docs/trazabilidad.md` |
-| Matriz ISO/IEC 25010 | Se incorpora en una versión posterior de este plan |
+| Matriz ISO/IEC 25010 | Sección 15 de este plan (desde la v1.1) |
 | Código de pruebas | `test/` de cada repositorio |
 | Reportes de cobertura, análisis estático y carga | Artefactos del pipeline |
 | Registro de defectos | GitHub Issues del backend |
 | Evidencias (capturas) | Carpeta del grupo en Drive y anexos del informe |
+
+## 15. Matriz ISO/IEC 25010
+
+### 15.1. Características
+
+| Característica | Evidencia | Fuente |
+|---|---|---|
+| Adecuación funcional | Defectos de montos, sueldos, importaciones y validaciones: DEF-005, 006 y 010 (críticos), DEF-007, 009, 011, 012, 014, 015 y 016. Reglas RN-01 y RN-03 como oráculo | Issues; `docs/casos/` |
+| Eficiencia de desempeño | Sin saturación hasta 30 pet/s (46 usuarios virtuales): 0 % de errores y latencia estable. Sin degradación en 15 min de esfuerzo sostenido (−0,5 %). `/movimientos/flujo` supera el p95 de 1,5 s en todas las cargas (≈ 2,6 s), por su costo propio y no por la carga (H-55) | Workflow Rendimiento #2; `docs/herramienta-k6.md`; EV-66c, EV-66d |
+| Compatibilidad | Integración con Supabase probada contra una base real (nexacore-test): 13 pruebas de integración, que detectaron DEF-018 | `test/integracion/`; EV-41, EV-45a |
+| Usabilidad | Mensajes de error y avisos: un monto 0 devolvía "Faltan campos obligatorios" (DEF-008); errores que se muestran como "No hay datos" (H-42) o como contraseña incorrecta (H-43) | `docs/hallazgos.md`; #25 |
+| Fiabilidad | Plan de contingencia ante la caída de Supabase (H-37 a H-45, CP-FIN-18). Fuente alternativa de la cotización del dólar ante datos no numéricos (DEF-013, DEF-019) | `docs/plan-contingencia.md`; #31, #44 |
+| Seguridad | Acceso indebido a Finanzas (DEF-001 a 004) y lectura de sueldos y asignación de permisos con la clave pública de Supabase, sin iniciar sesión (DEF-018, crítico). Regla RN-02 verificada con 433 pruebas | Issues; `test/finanzas.permisos.test.js`; EV-54a, EV-54b |
+| Mantenibilidad | Complejidad ciclomática del backend del módulo: 616 en la línea base y 686 al cierre; frontend, 1.122. El archivo más complejo del backend es `salariosService.js` (118); en el frontend, `Movimientos.jsx` (284) e `ImportarExcel.jsx` (238). Duplicación del backend: 2,3 % → 0,0 % (mejora H-02); frontend, 0,7 %. Issues de mantenibilidad: 14 → 10 en el backend y 6 en el frontend | SonarQube Cloud; EV-16, EV-18a, EV-58; H-02, H-06 |
+| Portabilidad | Backend en Docker con Node 22 (H-08). El pipeline construye la imagen en cada pull request, la despliega en el runner y el smoke verifica que arranca, se conecta a Supabase y responde con la versión desplegada | `Dockerfile`; `.github/workflows/ci.yml`; EV-64b, EV-67b |
+
+### 15.2. Características prioritarias
+
+| Prioridad | Característica | Justificación |
+|---|---|---|
+| 1 | Seguridad | Es la característica con más defectos críticos y la de mayor impacto: el módulo guarda sueldos y datos contables. Cualquier usuario autenticado podía consultar y modificar Finanzas (DEF-001) y, con la clave pública del frontend, se podían leer sueldos y asignarse permisos directamente en Supabase sin iniciar sesión (DEF-018). Ninguno de los dos se veía usando la aplicación: aparecieron con tablas de decisión por rol y con pruebas de integración |
+| 2 | Adecuación funcional | Un dato financiero incorrecto se propaga al libro diario y a las decisiones de la dirección. Tres defectos críticos eran de este tipo: montos con formato argentino guardados mal en la migración y en el Excel (DEF-005, DEF-006) y sueldos en dólares guardados como pesos (DEF-010). Por eso se definieron RN-01 y RN-03 antes de corregir |
+| 3 | Fiabilidad | El módulo depende por completo de Supabase y de servicios externos de cotización. El diagnóstico del plan de contingencia mostró que una caída no se detecta, se informa como error de contraseña y puede dejar importaciones a medias (H-37 a H-45). Y la cotización del dólar aceptaba valores no numéricos (DEF-013, DEF-019) |
+
+**Por qué no las otras:** la mantenibilidad explica un defecto (H-02 → DEF-012), pero sus problemas son de costo de cambio, no de datos incorrectos o expuestos. La eficiencia es menos crítica para una empresa chica con pocos usuarios simultáneos, y se cubre con las pruebas de carga.

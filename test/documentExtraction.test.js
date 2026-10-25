@@ -19,7 +19,7 @@ function facturaEjemplo() {
     pointOfSale: '0006', documentNumber: '00002845', cae: '6261619010019',
     issueDate: '2026-06-25', currency: 'ARS', subtotal: 50473.74,
     discountsTotal: 2856.99, ivaTotal: 9999.52, otherTaxesTotal: 0, total: 57616.26,
-    items: [{ code: 'A0085', description: 'FUENTE SWITCHING 12V 2A X5', quantity: 2, unitPrice: 25236.87, discount: 0, ivaRate: 21, lineTotal: 57616.26 }],
+    items: [{ code: 'A0085', description: 'FUENTE SWITCHING 12V 2A X5', quantity: 2, unitPrice: 25236.87, discount: 0, ivaRate: 21, lineTotal: 50473.74 }],
     suggestedCategory: 'Tecnología', suggestedTransactionType: 'Gasto', description: 'Compra de fuente switching'
   };
 }
@@ -54,8 +54,17 @@ test('bloquea creación si los importes no concilian, falta CUIT o la categoría
   const validation = validateExtraction(normalizeExtraction(invoice), '30601575279');
   assert.equal(validation.valid, false);
   assert.match(validation.errors.join(' '), /emisor/i);
-  assert.match(validation.errors.join(' '), /categoría/i);
   assert.match(validation.errors.join(' '), /concilia/i);
+  // La categoría inválida no bloquea: queda como advertencia y se asigna "Otros"
+  assert.doesNotMatch(validation.errors.join(' '), /categoría/i);
+  assert.match(validation.warnings.join(' '), /categoría/i);
+  assert.match(validation.warnings.join(' '), /"Otros"/);
+
+  const conCategoriaInvalida = facturaEjemplo();
+  conCategoriaInvalida.suggestedCategory = 'Sin clasificar';
+  const sinBloqueo = validateExtraction(normalizeExtraction(conCategoriaInvalida), '30601575279');
+  assert.equal(sinBloqueo.valid, true);
+  assert.equal(sinBloqueo.movimiento.categoria, 'Otros');
 });
 
 test('genera claves de deduplicación fiscal y alternativa estables', () => {
