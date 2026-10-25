@@ -1,0 +1,112 @@
+# Pruebas de rendimiento con k6 (stress y esfuerzo sostenido) del backend.
+# Job separado del pipeline de calidad (plan de pruebas, 3.2): NO corre en cada PR.
+#
+# Se dispara solo a mano:
+#   - en un PR hacia develop, con la etiqueta "rendimiento" (corrida completa, ~25 min)
+#     o "rendimiento-demo" (versión corta para la demostración, ~6 min);
+#   - o desde Actions → Rendimiento → Run workflow (cuando el archivo llegue a la rama principal).
+# Los dos modos usan los mismos scripts y umbrales; solo cambia la duración.
+#
+# La instancia se despliega dentro del runner, apuntada solo a nexacore-test,
+# y las pruebas son de solo lectura (no modifican el seed).
+name: Rendimiento
+
+on:
+  pull_request:
+    types: [labeled]
+    branches: [develop]
+  workflow_dispatch:
+    inputs:
+      escenario:
+        description: Qué prueba correr
+        type: choice
+        options: [ambas, stress, sostenido]
+        default: ambas
+
+permissions:
+  contents: read
+
+# Nunca dos corridas de carga a la vez sobre nexacore-test.
+concurrency:
+  group: rendimiento-nexacore-test
+  cancel-in-progress: false
+
+jobs:
+  k6:
+    name: Stress y esfuerzo sostenido (k6, nexacore-test)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.label.name == 'rendimiento' ||
+      github.event.label.name == 'rendimiento-demo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SUPABASE_TEST_URL: ${{ secrets.SUPABASE_TEST_URL }}
+      SUPABASE_TEST_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_TEST_SERVICE_ROLE_KEY }}
+      SUPABASE_TEST_ANON_KEY: ${{ secrets.SUPABASE_TEST_ANON_KEY }}
+      TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+      ESCENARIO: ${{ inputs.escenario || 'ambas' }}
+      # Modo demo: escalones de 30 s y 3 min de sostenido. Completo: 90 s y 15 min.
+      ESCALON_S: ${{ github.event.label.name == 'rendimiento-demo' && '30' || '90' }}
+      DURACION: ${{ github.event.label.name == 'rendimiento-demo' && '3m' || '15m' }}
+      K6_IMAGEN: grafana/k6:2.3.0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Construir la imagen de esta versión
+        run: docker build --build-arg APP_VERSION=${{ github.sha }} -t nexacore-backend:${{ github.sha }} .
+
+      - name: Desplegar la instancia de prueba
+        run: |
+          docker run -d --name nexacore-backend -p 3001:3001 \
+            -e SUPABASE_URL="$SUPABASE_TEST_URL" \
+            -e SUPABASE_SERVICE_KEY="$SUPABASE_TEST_SERVICE_ROLE_KEY" \
+            -e DB_LABEL=nexacore-test \
+            nexacore-backend:${{ github.sha }}
+          for intento in $(seq 1 30); do
+            curl -sf -o /dev/null http://localhost:3001/api/health && exit 0
+            sleep 2
+          done
+          echo "La instancia no respondió /api/health"; docker logs nexacore-backend; exit 1
+
+      - name: Preparar la carpeta de resultados
+        run: mkdir -p k6/resultados
+
+      - name: Stress (escalones de 2 a 30 pet/s)
+        if: env.ESCENARIO == 'ambas' || env.ESCENARIO == 'stress'
+        run: |
+          docker run --rm --network host -u "$(id -u):$(id -g)" \
+            -v "$PWD:/repo" -w /repo \
+            -e BASE_URL=http://localhost:3001 -e ESCALON_S \
+            -e SUPABASE_TEST_URL -e SUPABASE_TEST_ANON_KEY -e TEST_USER_PASSWORD \
+            "$K6_IMAGEN" run k6/stress.js
+
+      - name: Esfuerzo sostenido (3 pet/s)
+        if: (success() || failure()) && (env.ESCENARIO == 'ambas' || env.ESCENARIO == 'sostenido')
+        run: |
+          docker run --rm --network host -u "$(id -u):$(id -g)" \
+            -v "$PWD:/repo" -w /repo \
+            -e BASE_URL=http://localhost:3001 -e DURACION \
+            -e SUPABASE_TEST_URL -e SUPABASE_TEST_ANON_KEY -e TEST_USER_PASSWORD \
+            "$K6_IMAGEN" run k6/sostenido.js
+
+      - name: Reporte en el resumen de la ejecución
+        if: always()
+        run: cat k6/resultados/*-resumen.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "Sin resultados de k6" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Guardar los resultados completos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-k6-${{ github.sha }}
+          path: k6/resultados/
+          if-no-files-found: warn
+
+      - name: Registro de la instancia (solo si falla)
+        if: failure()
+        run: docker logs nexacore-backend
+
+      - name: Apagar la instancia
+        if: always()
+        run: docker rm -f nexacore-backend
