@@ -3,11 +3,13 @@ const router = express.Router();
 const ctrl = require('../controllers/indicadoresController');
 const { authenticate } = require('../../middleware/authMiddleware');
 const { requireModuleAccess, requireModulePermission } = require('../../middleware/rbacMiddleware');
+const { consultaFinanzas } = require('../../finance/config/permisos');
 
 // Definiciones de KPI: permiso propio del módulo 'indicadores'.
-// Endpoints que exponen o calculan datos financieros: además, acceso a 'finance'.
+// Endpoints que exponen o calculan datos financieros: además, consulta de
+// Finanzas según RN-02 (mando alto o permiso particular; el de rol no alcanza).
 const verIndicadores = requireModuleAccess('indicadores', 'Indicadores');
-const verFinanzas = requireModuleAccess('finance', 'Finanzas');
+const verFinanzas = consultaFinanzas;
 const editarIndicadores = requireModulePermission('indicadores', 'editor', 'Indicadores');
 const administrarIndicadores = requireModulePermission('indicadores', 'administrador', 'Indicadores');
 
