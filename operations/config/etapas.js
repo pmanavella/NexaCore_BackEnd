@@ -25,8 +25,22 @@ const ESTADO_CANONICO_POR_TIPO_BASE = Object.freeze(
   Object.fromEntries(TIPOS_BASE.map(t => [t, TIPOS_BASE_CONFIG[t].estado]))
 );
 
+// Valores de tareas.estado que solo aparecen en etapas cerradas (Completada,
+// Cancelada). Respaldo para tareas sin etapa (anteriores a las etapas).
+const ESTADOS_CERRADOS = Object.freeze([...new Set(TIPOS_BASE_CERRADOS.map(t => TIPOS_BASE_CONFIG[t].estado))]);
+
+// Una tarea está abierta según el tipo_base de su etapa (operativo_etapas
+// embebida). Sin etapa, según su estado canónico: abierta salvo que sea de
+// cierre. Nunca se mira el nombre visible de la etapa.
+function esTareaAbierta(tarea) {
+  const config = TIPOS_BASE_CONFIG[tarea?.operativo_etapas?.tipo_base];
+  if (config) return config.abierta;
+  return !ESTADOS_CERRADOS.includes(tarea?.estado);
+}
+
 module.exports = {
   TIPOS_BASE,
   TIPOS_BASE_CERRADOS,
   ESTADO_CANONICO_POR_TIPO_BASE,
+  esTareaAbierta,
 };
