@@ -137,16 +137,40 @@ test('deudas: la fecha es la de Argentina (a las 22 h del 2/11 en Argentina, una
   assert.equal(porId(r)['finance:deudas:por_vencer'].cantidad, 1);
 });
 
-test('comprobantes: solo los que requieren revisión (no procesados ni con error)', async (t) => {
-  const { db } = crearBase(t);
-  simularPermisos(t, { finanzas: 'lector' });
+test('comprobantes: no generan alertas ni se consultan, aunque haya comprobantes en revisión', async (t) => {
+  const { db, consultas } = crearBase(t);
   db.comprobantes.push(
     { id: 1, estado_analisis: 'requiere_revision' }, { id: 2, estado_analisis: 'requiere_revision' },
     { id: 3, estado_analisis: 'procesado' }, { id: 4, estado_analisis: 'error' },
   );
-  const a = porId(await evaluar(usuario()))['finance:comprobantes:requiere_revision'];
-  assert.equal(a.cantidad, 2);
-  assert.deepEqual(a.destino, { modulo: 'finance', seccion: 'comprobantes' });
+  for (const user of [usuario(), DIRECCION()]) {
+    simularPermisos(t, { finanzas: 'lector', indicadores: true });
+    const r = await evaluar(user);
+    assert.ok(!r.alertas.some(a => a.id.includes('comprobantes') || a.destino.seccion === 'comprobantes'));
+    assert.ok(!r.fuentes.some(f => f.fuente === 'comprobantes'));
+  }
+  assert.ok(!consultas.includes('comprobantes'), 'no consulta la tabla comprobantes');
+});
+
+test('el endpoint solo puede devolver las siete categorías vigentes', async (t) => {
+  const { db } = crearBase(t);
+  simularPermisos(t, { finanzas: 'lector', indicadores: true });
+  const dir = DIRECCION();
+  db.deudas.push({ id: 1, estado: 'Pendiente', vencimiento: dia(-1) }, { id: 2, estado: 'Pendiente', vencimiento: dia(1) });
+  db.comprobantes.push({ id: 1, estado_analisis: 'requiere_revision' });
+  tareaDe(db, dir, { fecha_limite: dia(-1) });
+  tareaDe(db, dir, { fecha_limite: dia(1), asignadaHaceHoras: 1 });
+  db.movimientos.push({ mes: '2026-10-01', tipo: 'Ingreso', categoria: 'Servicios', total: 800 });
+  indicador(db, { nombre: 'Riesgo', objetivo: 1000, limite: 700 });
+  indicador(db, { nombre: 'Crítico', objetivo: 2000, limite: 1500 });
+
+  const r = await evaluar(dir);
+  assert.deepEqual(r.alertas.map(a => a.id).sort(), [
+    'finance:deudas:por_vencer', 'finance:deudas:vencidas',
+    'indicadores:fuera_de_objetivo:critico', 'indicadores:fuera_de_objetivo:en_riesgo',
+    'operations:tareas:nuevas_asignaciones', 'operations:tareas:por_vencer', 'operations:tareas:vencidas',
+  ]);
+  assert.deepEqual(r.fuentes.map(f => f.fuente), ['deudas', 'tareas', 'indicadores']);
 });
 
 test('permisos de Finanzas (RN-02): sin permiso particular no hay alertas ni consultas financieras; mando alto sí', async (t) => {
@@ -157,12 +181,11 @@ test('permisos de Finanzas (RN-02): sin permiso particular no hay alertas ni con
   simularPermisos(t, { finanzas: null }); // rol con Finanzas pero sin permiso particular
   const sinPermiso = await evaluar(usuario());
   assert.equal(sinPermiso.alertas.filter(x => x.modulo === 'finance').length, 0);
-  assert.ok(!consultas.includes('deudas') && !consultas.includes('comprobantes'), 'ni siquiera consulta');
+  assert.ok(!consultas.includes('deudas'), 'ni siquiera consulta');
   assert.deepEqual(sinPermiso.fuentes.map(f => f.fuente), ['tareas'], 'no informa fuentes sin acceso');
 
   const dir = await evaluar(DIRECCION());
-  assert.deepEqual(dir.alertas.filter(x => x.modulo === 'finance').map(x => x.id).sort(),
-    ['finance:comprobantes:requiere_revision', 'finance:deudas:vencidas']);
+  assert.deepEqual(dir.alertas.filter(x => x.modulo === 'finance').map(x => x.id), ['finance:deudas:vencidas']);
 });
 
 // ── Operativo ────────────────────────────────────────────────────────────────
@@ -296,7 +319,7 @@ test('sin alertas: lista vacía, no parcial, con las fuentes evaluadas', async (
   const r = await evaluar(usuario());
   assert.deepEqual(r, {
     alertas: [], total: 0, generado_en: AHORA.toISOString(), parcial: false,
-    fuentes: [{ fuente: 'deudas', estado: 'ok' }, { fuente: 'comprobantes', estado: 'ok' }, { fuente: 'tareas', estado: 'ok' }, { fuente: 'indicadores', estado: 'ok' }],
+    fuentes: [{ fuente: 'deudas', estado: 'ok' }, { fuente: 'tareas', estado: 'ok' }, { fuente: 'indicadores', estado: 'ok' }],
   });
 });
 
@@ -321,7 +344,7 @@ test('las alertas desaparecen al resolverse la condición; ids estables entre ev
 });
 
 test('error parcial: si una fuente falla se informa, la respuesta queda parcial y el resto se devuelve', async (t) => {
-  const { db } = crearBase(t, { fallas: ['comprobantes', 'rpc'] });
+  const { db } = crearBase(t, { fallas: ['tarea_asignados', 'rpc'] });
   simularPermisos(t, { finanzas: 'lector', indicadores: true });
   t.mock.method(console, 'error', () => {});
   db.deudas.push({ id: 1, estado: 'Pendiente', vencimiento: dia(-1) });
@@ -332,14 +355,13 @@ test('error parcial: si una fuente falla se informa, la respuesta queda parcial 
   assert.deepEqual(r.alertas.map(a => a.id), ['finance:deudas:vencidas']);
   assert.deepEqual(r.fuentes, [
     { fuente: 'deudas', estado: 'ok' },
-    { fuente: 'comprobantes', estado: 'error', motivo: 'ERROR' },
-    { fuente: 'tareas', estado: 'ok' },
+    { fuente: 'tareas', estado: 'error', motivo: 'ERROR' },
     { fuente: 'indicadores', estado: 'error', motivo: 'ERROR' },
   ]);
 });
 
 test('una fuente lenta no bloquea la respuesta (TIMEOUT); si no se pueden verificar permisos, no se asume acceso', async (t) => {
-  const { db } = crearBase(t, { lentas: ['comprobantes'] });
+  const { db } = crearBase(t, { lentas: ['tarea_asignados'] });
   simularPermisos(t, { finanzas: 'lector' });
   t.mock.method(console, 'error', () => {});
   const plazoOriginal = alertasService.plazoFuenteMs;
@@ -348,21 +370,23 @@ test('una fuente lenta no bloquea la respuesta (TIMEOUT); si no se pueden verifi
   db.deudas.push({ id: 1, estado: 'Pendiente', vencimiento: dia(-1) });
   const r = await evaluar(usuario());
   assert.equal(r.parcial, true);
-  assert.deepEqual(r.fuentes.find(f => f.fuente === 'comprobantes'), { fuente: 'comprobantes', estado: 'error', motivo: 'TIMEOUT' });
-  assert.equal(r.alertas[0].id, 'finance:deudas:vencidas');
+  assert.deepEqual(r.fuentes.find(f => f.fuente === 'tareas'), { fuente: 'tareas', estado: 'error', motivo: 'TIMEOUT' });
+  assert.deepEqual(r.alertas.map(a => a.id), ['finance:deudas:vencidas']);
 
   simularPermisos(t, { fallaPermisos: true });
   const sinPermisos = await evaluar(usuario());
   assert.equal(sinPermisos.alertas.filter(a => a.modulo !== 'operations').length, 0);
-  assert.deepEqual(sinPermisos.fuentes.filter(f => f.fuente !== 'tareas').map(f => f.motivo), ['PERMISOS_NO_VERIFICADOS', 'PERMISOS_NO_VERIFICADOS', 'PERMISOS_NO_VERIFICADOS']);
+  assert.deepEqual(sinPermisos.fuentes.filter(f => f.fuente !== 'tareas').map(f => [f.fuente, f.motivo]),
+    [['deudas', 'PERMISOS_NO_VERIFICADOS'], ['indicadores', 'PERMISOS_NO_VERIFICADOS']]);
 });
 
-test('rendimiento: conteos de deudas y comprobantes sin traer filas; sin tareas asignadas no consulta tareas', async (t) => {
+test('rendimiento: conteos de deudas sin traer filas; sin tareas asignadas no consulta tareas; nunca consulta comprobantes', async (t) => {
   const { consultas } = crearBase(t);
   simularPermisos(t, { finanzas: 'lector' });
   await evaluar(usuario());
   assert.deepEqual(consultas.filter(c => c === 'deudas').length, 2);
   assert.ok(!consultas.includes('tareas'));
+  assert.ok(!consultas.includes('comprobantes'));
 });
 
 // ── HTTP ─────────────────────────────────────────────────────────────────────
