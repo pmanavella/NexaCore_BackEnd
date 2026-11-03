@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/operationsController');
+const actualizaciones = require('../controllers/actualizacionesController');
 const { authenticate } = require('../../middleware/authMiddleware');
 const { requireModuleAccess } = require('../../middleware/rbacMiddleware');
 
@@ -14,6 +15,21 @@ router.post('/propuestas/:id/rechazar', ctrl.rechazarPropuesta.bind(ctrl));
 
 // Historial de una tarea
 router.get('/:id/historial', ctrl.obtenerHistorial.bind(ctrl));
+
+// Panel "Actualizaciones": comentarios + registros de tiempo finalizados.
+// Acceso: miembros del tablero de la tarea (y mando alto), sin requerir
+// asignación (lo verifica tareaActualizacionesService).
+router.get('/:id/actualizaciones', actualizaciones.listarActualizaciones.bind(actualizaciones));
+
+router.get('/:id/comentarios',                   actualizaciones.listarComentarios.bind(actualizaciones));
+router.post('/:id/comentarios',                  actualizaciones.crearComentario.bind(actualizaciones));
+router.patch('/:id/comentarios/:comentarioId',   actualizaciones.editarComentario.bind(actualizaciones));
+router.delete('/:id/comentarios/:comentarioId',  actualizaciones.eliminarComentario.bind(actualizaciones));
+
+// Temporizador del usuario autenticado en la tarea (usuario + tarea).
+router.get('/:id/temporizador',          actualizaciones.obtenerTemporizador.bind(actualizaciones));
+router.post('/:id/temporizador/iniciar', actualizaciones.iniciarTemporizador.bind(actualizaciones));
+router.post('/:id/temporizador/detener', actualizaciones.detenerTemporizador.bind(actualizaciones));
 
 // CRUD tareas
 router.get('/',       ctrl.listarTareas.bind(ctrl));

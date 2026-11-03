@@ -42,6 +42,9 @@ function esTareaAbierta(tarea) {
 // tipo_base finales: la tarea terminó (completada) o se descartó (cancelada).
 // Guardan tareas.fecha_finalizacion y el Kanban las oculta pasadas 168 horas.
 // 'en_revision_cerrada' es cerrada pero NO final: sigue siempre visible.
+// La función SQL public.tarea_es_final (migración
+// 2026-11-03_tareas_comentarios_y_tiempos) replica este criterio para cerrar
+// temporizadores e impedir iniciarlos: si cambia acá, cambiarlo también ahí.
 const TIPOS_BASE_FINALES = Object.freeze(['completada', 'cancelada']);
 const VENTANA_KANBAN_MS = 7 * 24 * 60 * 60 * 1000; // 168 horas
 
