@@ -13,7 +13,7 @@ const { hoyArgentina } = require('../../indicators/services/periodos');
 //
 // Cada fuente aplica la MISMA regla de acceso que el endpoint original de sus
 // datos y usa solo la identidad de la sesión (req.user):
-//   - deudas, comprobantes: consulta de Finanzas RN-02 (consultaFinanzas).
+//   - deudas: consulta de Finanzas RN-02 (consultaFinanzas).
 //   - tareas: tableros visibles (miembros; mando alto ve todos), como GET /tareas.
 //   - indicadores: acceso al módulo Indicadores + consulta de Finanzas, como
 //     GET /indicadores/:id/valor.
@@ -35,7 +35,6 @@ const SEVERIDADES = ['alta', 'media', 'info'];
 // Destinos de navegación: valores fijos, nunca construidos con datos de la base.
 const DESTINOS = Object.freeze({
   deudas:       { modulo: 'finance', seccion: 'deudas' },
-  comprobantes: { modulo: 'finance', seccion: 'comprobantes' },
   tareas:       { modulo: 'operations', seccion: null },
   indicadores:  { modulo: 'indicadores', seccion: null },
 });
@@ -108,17 +107,6 @@ class AlertasService {
       }));
     }
     return alertas;
-  }
-
-  async _alertasComprobantes() {
-    const enRevision = await contar('comprobantes', q => q.eq('estado_analisis', 'requiere_revision'));
-    if (!enRevision) return [];
-    return [alerta({
-      id: 'finance:comprobantes:requiere_revision', modulo: 'finance', tipo: 'comprobantes_requieren_revision', severidad: 'media',
-      titulo: 'Comprobantes para revisar',
-      mensaje: `${enRevision} ${plural(enRevision, 'comprobante requiere', 'comprobantes requieren')} revisión.`,
-      cantidad: enRevision, destino: DESTINOS.comprobantes,
-    })];
   }
 
   // ── Operativo ─────────────────────────────────────────────────────────────
@@ -239,10 +227,9 @@ class AlertasService {
       : acceso(moduloIndicadores);
 
     const fuentes = [
-      { fuente: 'deudas',       acceso: accesoFinanzas,    evaluar: () => this._alertasDeudas(hoy) },
-      { fuente: 'comprobantes', acceso: accesoFinanzas,    evaluar: () => this._alertasComprobantes() },
-      { fuente: 'tareas',       acceso: true,              evaluar: () => this._alertasTareas(user, hoy, ahora) },
-      { fuente: 'indicadores',  acceso: accesoIndicadores, evaluar: () => this._alertasIndicadores(ahora) },
+      { fuente: 'deudas',      acceso: accesoFinanzas,    evaluar: () => this._alertasDeudas(hoy) },
+      { fuente: 'tareas',      acceso: true,              evaluar: () => this._alertasTareas(user, hoy, ahora) },
+      { fuente: 'indicadores', acceso: accesoIndicadores, evaluar: () => this._alertasIndicadores(ahora) },
     ].filter(f => f.acceso !== false);
 
     const resultados = await Promise.all(fuentes.map(async (f) => {
