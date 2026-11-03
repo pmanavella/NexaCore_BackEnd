@@ -2,6 +2,12 @@ const supabase = require('../../config/supabase');
 
 const ESTADOS_VALIDOS = ['Pendiente', 'Pagada', 'Vencida'];
 
+const MENSAJE_DEUDA_PAGADA = 'La deuda ya está pagada y no se puede modificar.';
+
+function errorDeudaPagada() {
+  return Object.assign(new Error(MENSAJE_DEUDA_PAGADA), { status: 409 });
+}
+
 class DeudasService {
   async listar({ estado, search } = {}) {
     let query = supabase
@@ -67,7 +73,21 @@ class DeudasService {
     return data;
   }
 
+  // Una deuda pagada no se modifica (409): lo decide el estado guardado en la
+  // base, no el del body. Pagar es esta misma operación con estado 'Pagada'
+  // sobre una deuda que todavía no lo está, y sigue permitido. El UPDATE
+  // vuelve a exigir que no esté pagada, para que una edición que llega
+  // mientras otro pedido la paga no la modifique después del pago.
   async actualizar(id, body, email = null) {
+    const { data: actual, error: errLectura } = await supabase
+      .from('deudas')
+      .select('id, estado')
+      .eq('id', id)
+      .maybeSingle();
+    if (errLectura) throw errLectura;
+    if (!actual) throw Object.assign(new Error('No encontrado'), { status: 404 });
+    if (actual.estado === 'Pagada') throw errorDeudaPagada();
+
     const { acreedor, descripcion, monto, vencimiento, estado, notas } = body;
     this._validar({ acreedor, monto, vencimiento, estado });
 
@@ -84,9 +104,11 @@ class DeudasService {
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
+      .neq('estado', 'Pagada')
       .select()
-      .single();
+      .maybeSingle();
     if (error) throw error;
+    if (!data) throw errorDeudaPagada();
     return data;
   }
 

@@ -27,11 +27,11 @@ class OperationsController {
   async listarPropuestas(req, res, next) {
     try { res.json(await operationsService.listarPropuestas(req.query, req.user)); } catch (err) { next(err); }
   }
-  // req.body puede incluir { usuario_nombre, usuario_id } para registrar quién aprobó
+  // Quién aprueba sale de req.user; el body (usuario_nombre, usuario_id) se ignora.
   async aprobarPropuesta(req, res, next) {
     try { res.json(await operationsService.aprobarPropuesta(req.params.id, req.body, req.user)); } catch (err) { next(err); }
   }
-  // req.body puede incluir { usuario_nombre, usuario_id } para registrar quién rechazó
+  // Quién rechaza sale de req.user; el body (usuario_nombre, usuario_id) se ignora.
   async rechazarPropuesta(req, res, next) {
     try { res.json(await operationsService.rechazarPropuesta(req.params.id, req.body, req.user)); } catch (err) { next(err); }
   }

@@ -5,7 +5,7 @@ const {
 } = require('../config/indicadores');
 const { VARIABLES, CLAVES_VARIABLES, calcularVariables } = require('./variablesFinancieras');
 const { analizarFormula, evaluarFormula } = require('./formulaParser');
-const { hoyArgentina, resolverPeriodoIndicador, periodosDeVentana } = require('./periodos');
+const { hoyArgentina, resolverPeriodoIndicador, periodosDeVentana, periodoActual, periodoAnterior } = require('./periodos');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const COLUMNAS = 'id, nombre, descripcion, perspectiva, responsable, frecuencia, formula, unidad, sentido, valor_objetivo, limite_aceptable, activo, created_at, updated_at, created_by, updated_by';
@@ -286,6 +286,51 @@ class IndicadoresService {
       variacion,
       direccion: variacion > 0 ? 'SUBE' : variacion < 0 ? 'BAJA' : 'ESTABLE',
     };
+  }
+
+  // ── Soporte para Alertas ────────────────────────────────────────────────────
+
+  // Estado de cada indicador activo en su último período CERRADO (el anterior
+  // al período en curso según su frecuencia: el actual es parcial y daría
+  // incumplimientos falsos a mitad de mes). Mismo cálculo que calcularValor
+  // (_calcularPunto + calcularEstado), con una sola consulta de movimientos
+  // para todos. `estado` es null (sin alerta posible) cuando:
+  //   - el período no tiene ningún movimiento cargado ('SIN_DATOS'), o
+  //   - la fórmula ya no es válida ('FORMULA_INVALIDA'), o
+  //   - el valor no se puede calcular (ej. división por cero; 'SIN_VALOR').
+  async evaluarUltimoPeriodoCerrado({ ahora } = {}) {
+    const { data: indicadores, error } = await supabase
+      .from('indicadores')
+      .select(COLUMNAS)
+      .eq('activo', true)
+      .order('nombre', { ascending: true });
+    if (error) throw error;
+    if (!indicadores?.length) return [];
+
+    const hoy = hoyArgentina(ahora);
+    const evaluables = indicadores.map(ind => ({
+      ind,
+      periodo: periodoAnterior(periodoActual(ind.frecuencia, hoy), hoy),
+    }));
+    const desde = evaluables.reduce((min, e) => (e.periodo.desde < min ? e.periodo.desde : min), evaluables[0].periodo.desde);
+    const hasta = evaluables.reduce((max, e) => (e.periodo.hasta > max ? e.periodo.hasta : max), evaluables[0].periodo.hasta);
+    const filas = await this._totalesMovimientos(desde, hasta);
+
+    return evaluables.map(({ ind, periodo }) => {
+      const base = { id: ind.id, nombre: ind.nombre, periodo: presentarPeriodo(periodo) };
+      if (!filas.some(f => f.mes >= periodo.desde && f.mes < periodo.hasta)) {
+        return { ...base, valor: null, estado: null, motivo: 'SIN_DATOS' };
+      }
+      let analisis;
+      try {
+        analisis = this._analizarFormulaGuardada(ind);
+      } catch (err) {
+        if (err.status !== 409) throw err;
+        return { ...base, valor: null, estado: null, motivo: 'FORMULA_INVALIDA' };
+      }
+      const { valor, estado } = this._calcularPunto(ind, analisis, filas, periodo);
+      return { ...base, valor, estado, motivo: estado ? null : 'SIN_VALOR' };
+    });
   }
 
   // ── Soporte para Dashboard ──────────────────────────────────────────────────
