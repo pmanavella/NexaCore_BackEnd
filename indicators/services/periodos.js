@@ -128,6 +128,7 @@ module.exports = {
   hoyArgentina,
   construirPeriodo,
   periodoActual,
+  periodoAnterior,
   parsearClave,
   resolverPeriodoIndicador,
   periodosDeVentana,
