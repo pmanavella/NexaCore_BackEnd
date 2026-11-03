@@ -1,6 +1,9 @@
 const supabase = require('../../config/supabase');
 const { resolverPeriodo, rangoMes } = require('../../utils/periodo');
-const { TIPOS_BASE, TIPOS_BASE_CERRADOS, ESTADO_CANONICO_POR_TIPO_BASE, esTareaAbierta } = require('../config/etapas');
+const {
+  TIPOS_BASE, TIPOS_BASE_CERRADOS, TIPOS_BASE_FINALES, ESTADO_CANONICO_POR_TIPO_BASE,
+  esTareaAbierta, esTareaFinal, esVisibleEnKanban,
+} = require('../config/etapas');
 const tareaAsignados = require('./tareaAsignados');
 const tablerosService = require('./tablerosService');
 
@@ -28,6 +31,9 @@ const CAMPOS_EDITABLES = [
 ];
 
 const TIPOS_TAREA = ['asignacion', 'propuesta'];
+
+// Valores de `vista` en GET /tareas (ver listarTareas).
+const VISTAS_TAREAS = ['kanban', 'historial'];
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -148,6 +154,28 @@ class OperationsService {
     }
   }
 
+  // Mantiene tareas.fecha_finalizacion (Kanban de 7 días, migración
+  // 2026-11-03_tareas_fecha_finalizacion) al pasar a `etapa`:
+  //   - a un tipo_base final (completada/cancelada) desde otro tipo_base: ahora
+  //     (reabrir y volver a finalizar reinicia el plazo);
+  //   - a un tipo_base no final: NULL (solo si tenía fecha);
+  //   - a la misma etapa u otra del mismo tipo_base final: sin cambios.
+  // `actual` es la tarea en la base (objeto vacío si es un alta).
+  async _aplicarFechaFinalizacion(campos, etapa, actual) {
+    if (!TIPOS_BASE_FINALES.includes(etapa.tipo_base)) {
+      if (actual.fecha_finalizacion) campos.fecha_finalizacion = null;
+      return;
+    }
+    if (actual.etapa_id === etapa.id) return;
+    let tipoBaseAnterior = null;
+    if (actual.etapa_id) {
+      const { data, error } = await supabase.from('operativo_etapas').select('tipo_base').eq('id', actual.etapa_id).maybeSingle();
+      if (error) throw error;
+      tipoBaseAnterior = data?.tipo_base ?? null;
+    }
+    if (tipoBaseAnterior !== etapa.tipo_base) campos.fecha_finalizacion = new Date().toISOString();
+  }
+
   // Restringe `query` a las tareas de una persona (incluye tareas compartidas).
   // asignado_id = usuario_id; asignado_a = nombre (filtro legacy, ver tareaAsignados).
   // Devuelve null si la persona no tiene tareas.
@@ -218,8 +246,16 @@ class OperationsService {
   // `tablero_id` es obligatorio y el usuario tiene que poder ver ese tablero.
   // `solo_mias` (opcional): solo las tareas donde el usuario es responsable.
   // `solo_abiertas` (opcional): solo las tareas en etapas abiertas (ver esTareaAbierta).
+  // `vista` (opcional):
+  //   - sin valor: todas las tareas (comportamiento histórico del endpoint).
+  //   - 'kanban': oculta las completadas/canceladas hace 168 horas o más
+  //     (ver esVisibleEnKanban); las que no tienen fecha confiable se muestran.
+  //   - 'historial': solo las completadas/canceladas, sin límite de tiempo.
   // Se combinan entre sí y con el resto de los filtros (AND).
-  async listarTareas({ estado, prioridad, asignado_a, asignado_id, etapa_id, tablero_id, solo_mias, solo_abiertas } = {}, user) {
+  async listarTareas({ estado, prioridad, asignado_a, asignado_id, etapa_id, tablero_id, solo_mias, solo_abiertas, vista } = {}, user) {
+    if (vista != null && vista !== '' && !VISTAS_TAREAS.includes(vista)) {
+      throw error400(`"vista" inválida: debe ser ${VISTAS_TAREAS.join(' o ')}.`);
+    }
     await tablerosService.asegurarAcceso(tablero_id, user);
 
     let query = supabase
@@ -238,7 +274,13 @@ class OperationsService {
 
     const { data, error } = await query;
     if (error) throw error;
-    const tareas = esVerdadero(solo_abiertas) ? data.filter(esTareaAbierta) : data;
+    let tareas = esVerdadero(solo_abiertas) ? data.filter(esTareaAbierta) : data;
+    if (vista === 'kanban') {
+      const ahora = Date.now();
+      tareas = tareas.filter(t => esVisibleEnKanban(t, ahora));
+    } else if (vista === 'historial') {
+      tareas = tareas.filter(esTareaFinal);
+    }
     return { data: tareas.map(formatearTarea), total: tareas.length };
   }
 
@@ -291,6 +333,7 @@ class OperationsService {
     // Si la tarea nace directamente en una etapa "en curso" o "completada"
     // (ej. se carga una tarea que ya se venía haciendo), completar sus fechas reales.
     this._aplicarFechasAutomaticas(nuevaTarea, etapa, {});
+    await this._aplicarFechaFinalizacion(nuevaTarea, etapa, {});
 
     const { data: creada, error } = await supabase
       .from('tareas')
@@ -376,6 +419,7 @@ class OperationsService {
       camposTarea.etapa_id = etapa.id;
       camposTarea.estado = ESTADO_CANONICO_POR_TIPO_BASE[etapa.tipo_base];
       this._aplicarFechasAutomaticas(camposTarea, etapa, tareaActual);
+      await this._aplicarFechaFinalizacion(camposTarea, etapa, tareaActual);
     }
 
     // Aplicar la actualización en la tabla tareas
@@ -623,11 +667,9 @@ class OperationsService {
     // Al aprobar, la tarea entra al tablero en la etapa inicial (tipo_base 'pendiente')
     const etapaInicial = await this._resolverEtapa(null);
 
-    const data = await this._resolverPropuesta(
-      id,
-      { tipo: 'asignacion', estado_propuesta: 'aprobada', estado: ESTADO_CANONICO_POR_TIPO_BASE[etapaInicial.tipo_base], etapa_id: etapaInicial.id },
-      SELECT_TAREA
-    );
+    const cambios = { tipo: 'asignacion', estado_propuesta: 'aprobada', estado: ESTADO_CANONICO_POR_TIPO_BASE[etapaInicial.tipo_base], etapa_id: etapaInicial.id };
+    await this._aplicarFechaFinalizacion(cambios, etapaInicial, antes);
+    const data = await this._resolverPropuesta(id, cambios, SELECT_TAREA);
 
     await this._registrarHistorial([{
       tarea_id:         id,

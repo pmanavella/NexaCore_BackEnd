@@ -890,3 +890,164 @@ test('propuestas antiguas sin UUID confiable de creación: se mantiene el compor
     assert.equal((await operationsService.aprobarPropuesta(id, {}, ANA)).estado_propuesta, 'aprobada', String(usuarioId));
   }
 });
+
+// ── Kanban de 7 días: completadas y canceladas ───────────────────────────────
+
+const HORA = 60 * 60 * 1000;
+const T0 = Date.parse('2026-11-02T12:00:00.000Z');
+
+// Reloj controlado: arranca en T0 y `avanzar(horas)` lo adelanta.
+async function prepararKanban(t) {
+  const ctx = await preparar(t);
+  t.mock.timers.enable({ apis: ['Date'], now: T0 });
+  const avanzar = (horas) => t.mock.timers.tick(horas * HORA);
+  const { ANA, mant } = ctx;
+  const crear = (titulo, etapa_id, extra = {}) => operationsService.crearTarea({ titulo, etapa_id, tablero_id: mant.id, ...extra }, ANA);
+  const mover = (id, etapa_id) => operationsService.actualizarTarea(id, { etapa_id }, ANA);
+  const titulos = async (filtros = {}, user = ANA) =>
+    (await operationsService.listarTareas({ tablero_id: mant.id, ...filtros }, user)).data.map(x => x.titulo).sort();
+  return { ...ctx, avanzar, crear, mover, titulos };
+}
+
+test('kanban: completadas y canceladas se ven durante 168 horas y desde la hora 168 exacta dejan de verse', async (t) => {
+  const { crear, mover, avanzar, titulos, db } = await prepararKanban(t);
+  await crear('abierta', 'e-curso');
+  const c = await crear('completada', 'e-curso');
+  const x = await crear('cancelada', 'e-pend');
+  await mover(c.id, 'e-ok');
+  await mover(x.id, 'e-canc');
+  assert.equal(db.tareas.find(r => r.id === c.id).fecha_finalizacion, new Date(T0).toISOString());
+
+  avanzar(167);
+  assert.deepEqual(await titulos({ vista: 'kanban' }), ['abierta', 'cancelada', 'completada']);
+  t.mock.timers.tick(HORA - 1); // 168 h - 1 ms
+  assert.deepEqual(await titulos({ vista: 'kanban' }), ['abierta', 'cancelada', 'completada']);
+  t.mock.timers.tick(1); // 168 h exactas
+  assert.deepEqual(await titulos({ vista: 'kanban' }), ['abierta']);
+  // Siguen en la base, en el historial y en el listado sin `vista` (consumidores actuales)
+  assert.deepEqual(await titulos({ vista: 'historial' }), ['cancelada', 'completada']);
+  assert.deepEqual(await titulos(), ['abierta', 'cancelada', 'completada']);
+  assert.equal(db.tareas.length, 3);
+  const fila = db.tareas.find(r => r.id === c.id);
+  assert.deepEqual([fila.etapa_id, fila.estado], ['e-ok', 'Completada'], 'no cambia de estado ni de etapa');
+});
+
+test('kanban: una tarea creada directamente como completada empieza su plazo al crearse', async (t) => {
+  const { crear, avanzar, titulos } = await prepararKanban(t);
+  await crear('nace-cerrada', 'e-ok');
+  avanzar(100);
+  assert.deepEqual(await titulos({ vista: 'kanban' }), ['nace-cerrada']);
+  avanzar(68);
+  assert.deepEqual(await titulos({ vista: 'kanban' }), []);
+});
+
+test('kanban: reabrir y volver a finalizar reinicia el plazo; pasar de completada a cancelada también', async (t) => {
+  const { crear, mover, avanzar, titulos, db } = await prepararKanban(t);
+  const a = await crear('a', 'e-ok');
+  const b = await crear('b', 'e-ok');
+  avanzar(150);
+  await mover(a.id, 'e-curso');
+  assert.equal(db.tareas.find(r => r.id === a.id).fecha_finalizacion, null, 'reabrir borra la fecha');
+  await mover(a.id, 'e-ok');
+  await mover(b.id, 'e-canc');
+  avanzar(100); // 250 h desde T0, 100 h desde la nueva finalización
+  assert.deepEqual(await titulos({ vista: 'kanban' }), ['a', 'b']);
+  avanzar(68);
+  assert.deepEqual(await titulos({ vista: 'kanban' }), []);
+});
+
+test('kanban: reenviar la misma etapa o moverse entre etapas del mismo tipo final no reinicia el plazo', async (t) => {
+  const { ANA, crear, mover, avanzar, titulos, db } = await prepararKanban(t);
+  db.operativo_etapas.push({ id: 'e-ok2', nombre: 'Entregada', tipo_base: 'completada', posicion: 6 });
+  const a = await crear('a', 'e-ok');
+  avanzar(100);
+  // Formulario completo del frontend (incluye la misma etapa_id)
+  await operationsService.actualizarTarea(a.id, { titulo: 'a', etapa_id: 'e-ok', prioridad: 'Alta' }, ANA);
+  await mover(a.id, 'e-ok2');
+  assert.equal(db.tareas.find(r => r.id === a.id).fecha_finalizacion, new Date(T0).toISOString());
+  avanzar(68);
+  assert.deepEqual(await titulos({ vista: 'kanban' }), []);
+});
+
+test('kanban: tareas finalizadas antes de la columna (sin fecha) no se ocultan; en_revision_cerrada nunca se oculta', async (t) => {
+  const { crear, mover, avanzar, titulos, mant, db } = await prepararKanban(t);
+  // Histórica: completada, sin fecha_finalizacion (y con created_at/fecha_fin_real viejos)
+  db.tareas.push({ id: randomUUID(), titulo: 'historica', tipo: 'asignacion', etapa_id: 'e-ok', estado: 'Completada',
+    tablero_id: mant.id, created_at: '2020-01-01T00:00:00Z', fecha_fin_real: '2020-01-02' });
+  db.tareas.push({ id: randomUUID(), titulo: 'sin-etapa', tipo: 'asignacion', etapa_id: null, estado: 'Cancelada',
+    tablero_id: mant.id, created_at: '2020-01-01T00:00:00Z' });
+  const r = await crear('revision-cerrada', 'e-curso');
+  await mover(r.id, 'e-revc');
+  assert.equal(db.tareas.find(x => x.id === r.id).fecha_finalizacion, undefined, 'en_revision_cerrada no guarda fecha');
+
+  avanzar(24 * 365);
+  assert.deepEqual(await titulos({ vista: 'kanban' }), ['historica', 'revision-cerrada', 'sin-etapa']);
+  assert.deepEqual(await titulos({ vista: 'historial' }), ['historica', 'sin-etapa']);
+});
+
+test('kanban: fecha_finalizacion no se puede enviar desde el cliente', async (t) => {
+  const { ANA, crear, avanzar, titulos, mant, db } = await prepararKanban(t);
+  const a = await operationsService.crearTarea({ titulo: 'a', etapa_id: 'e-ok', tablero_id: mant.id, fecha_finalizacion: '2000-01-01T00:00:00Z' }, ANA);
+  assert.equal(db.tareas.find(r => r.id === a.id).fecha_finalizacion, new Date(T0).toISOString());
+  await operationsService.actualizarTarea(a.id, { fecha_finalizacion: '2000-01-01T00:00:00Z' }, ANA);
+  assert.equal(db.tareas.find(r => r.id === a.id).fecha_finalizacion, new Date(T0).toISOString());
+  const p = await crear('abierta', 'e-pend');
+  assert.equal('fecha_finalizacion' in db.tareas.find(r => r.id === p.id), false, 'las tareas no finales no escriben la columna');
+  avanzar(1);
+  assert.deepEqual(await titulos({ vista: 'kanban' }), ['a', 'abierta']);
+});
+
+test('kanban: aprobar una propuesta creada como completada la devuelve a la etapa inicial y borra la fecha', async (t) => {
+  const { ANA, DIR, mant, beto, db } = await prepararKanban(t);
+  const p = await operationsService.crearTarea({ titulo: 'P', tipo: 'propuesta', etapa_id: 'e-ok', tablero_id: mant.id, asignados: [beto.id] }, ANA);
+  assert.ok(db.tareas.find(r => r.id === p.id).fecha_finalizacion);
+  await operationsService.aprobarPropuesta(p.id, {}, DIR);
+  assert.equal(db.tareas.find(r => r.id === p.id).fecha_finalizacion, null);
+});
+
+test('kanban: se combina con solo_mias y solo_abiertas; historial con solo_mias', async (t) => {
+  const { crear, avanzar, titulos, ana, beto } = await prepararKanban(t);
+  await crear('ana-vieja', 'e-ok', { asignados: [ana.id] });
+  await crear('beto-vieja', 'e-canc', { asignados: [beto.id] });
+  avanzar(200);
+  await crear('ana-reciente', 'e-ok', { asignados: [ana.id] });
+  await crear('ana-abierta', 'e-pend', { asignados: [ana.id] });
+  await crear('beto-abierta', 'e-curso', { asignados: [beto.id] });
+
+  assert.deepEqual(await titulos({ vista: 'kanban' }), ['ana-abierta', 'ana-reciente', 'beto-abierta']);
+  assert.deepEqual(await titulos({ vista: 'kanban', solo_mias: 'true' }), ['ana-abierta', 'ana-reciente']);
+  assert.deepEqual(await titulos({ vista: 'kanban', solo_abiertas: 'true' }), ['ana-abierta', 'beto-abierta']);
+  assert.deepEqual(await titulos({ vista: 'kanban', solo_mias: 'true', solo_abiertas: 'true' }), ['ana-abierta']);
+  assert.deepEqual(await titulos({ vista: 'historial' }), ['ana-reciente', 'ana-vieja', 'beto-vieja']);
+  assert.deepEqual(await titulos({ vista: 'historial', solo_mias: 'true' }), ['ana-reciente', 'ana-vieja']);
+  assert.deepEqual(await titulos({ vista: 'historial', solo_abiertas: 'true' }), []);
+});
+
+test('historial: respeta el acceso al tablero y valida `vista`', async (t) => {
+  const { CARO, DIR, crear, avanzar, titulos, usuario } = await prepararKanban(t);
+  await crear('vieja', 'e-ok');
+  avanzar(500);
+  await assert.rejects(titulos({ vista: 'historial' }, CARO), (err) => err.status === 403);
+  await assert.rejects(titulos({ vista: 'historial' }, { id: usuario('Nadia').id, hierarchyLevel: 'LOW' }), (err) => err.status === 403);
+  assert.deepEqual(await titulos({ vista: 'historial' }, DIR), ['vieja']);
+  for (const vista of ['archivo', 'KANBAN', 1]) {
+    await assert.rejects(titulos({ vista }), (err) => err.status === 400, String(vista));
+  }
+  assert.deepEqual(await titulos({ vista: '' }), ['vieja']);
+});
+
+test('métricas: completadas y canceladas cuentan el total histórico aunque ya no se vean en el Kanban', async (t) => {
+  const { ANA, mant, crear, avanzar, ana } = await prepararKanban(t);
+  await crear('ok-vieja', 'e-ok', { asignados: [ana.id] });
+  await crear('canc-vieja', 'e-canc');
+  avanzar(300);
+  await crear('ok-nueva', 'e-ok');
+  await crear('abierta', 'e-pend', { asignados: [ana.id] });
+
+  const m = await operationsService.getMetricas({ tablero_id: mant.id }, ANA);
+  assert.deepEqual([m.total, m.completadas, m.porTipoBase.completada, m.porTipoBase.cancelada, m.pendientes], [4, 2, 2, 1, 1]);
+  const mias = await operationsService.getMetricas({ tablero_id: mant.id, solo_mias: 'true' }, ANA);
+  assert.deepEqual([mias.total, mias.completadas], [2, 1]);
+  const abiertas = await operationsService.getMetricas({ tablero_id: mant.id, solo_abiertas: 'true' }, ANA);
+  assert.deepEqual([abiertas.total, abiertas.completadas], [1, 0]);
+});
