@@ -53,6 +53,9 @@ const nexiRoutes = require('./nexi/routes/nexi');
 // Alertas (calculadas en el momento, sin persistencia)
 const alertasRoutes = require('./alertas/routes/alertas');
 
+// Notificaciones persistentes por usuario (menciones; complementan a Alertas)
+const notificacionesRoutes = require('./notificaciones/routes/notificaciones');
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -119,6 +122,9 @@ app.use('/api/nexi', nexiRoutes);
 
 // ── Alertas ────────────────────────────────────────────
 app.use('/api/alertas', alertasRoutes);
+
+// ── Notificaciones ─────────────────────────────────────
+app.use('/api/notificaciones', notificacionesRoutes);
 
 // Health check (público, sin auth): consulta Supabase e informa la versión desplegada.
 app.get('/api/health', crearHealthCheck({ supabase: require('./config/supabase') }));
