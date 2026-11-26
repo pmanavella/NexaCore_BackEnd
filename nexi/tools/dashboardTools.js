@@ -56,7 +56,7 @@ function idBase(widgetId) {
 }
 
 function etiqueta(widgetId) {
-  const base = ETIQUETAS[idBase(widgetId)] || widgetId;
+  const base = ETIQUETAS[idBase(widgetId)] || DASHBOARD_WIDGETS[widgetId]?.title || widgetId;
   return widgetId.endsWith('_6m') ? `${base} (últimos 6 meses)` : base;
 }
 
@@ -242,6 +242,10 @@ async function datosWidget(widget, ctx) {
   const def = DASHBOARD_WIDGETS[widget.id];
   if (!def) return { disponible: false, motivo: 'Mosaico desconocido.' };
   const base = idBase(widget.id);
+  // Protocolos y Alertas: Nexi todavía no los calcula (Alertas no tiene módulo único).
+  if (def.group === 'protocolos' || def.usesHorizon) {
+    return { disponible: false, motivo: 'Nexi todavía no calcula este mosaico.' };
+  }
   if (base === 'finanzas_metricas_salarios') {
     return { disponible: false, motivo: 'Nexi no accede a información salarial (nómina).' };
   }
@@ -315,6 +319,8 @@ const catalogoDashboard = {
           periodos: def.periods.map(p => ETIQUETA_PERIODO[p] || p),
           visualizaciones: def.allowedChartTypes.map(c => ETIQUETA_GRAFICO[c] || c),
           requiere_indicador: !!def.requiresIndicator,
+          // Deprecados (CRM): existen por compatibilidad, pero no se pueden agregar como mosaico nuevo.
+          ...(def.deprecated ? { deprecado: true } : {}),
           disponible_para_el_usuario: dashboardService._widgetPermitido(id, habilitados, usuario.role),
         })),
     };

@@ -8,5 +8,6 @@ const { authenticate } = require('../../middleware/authMiddleware');
 router.use(authenticate);
 
 router.get('/', ctrl.listar.bind(ctrl));
+router.get('/proximas', ctrl.proximas.bind(ctrl));
 
 module.exports = router;
