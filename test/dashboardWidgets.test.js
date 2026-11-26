@@ -326,12 +326,14 @@ test('dashboardService.obtenerConfiguracion: un mosaico de indicador guardado se
 test('catálogo: default chartType/period dentro de sus listas permitidas', () => {
   for (const [id, w] of Object.entries(DASHBOARD_WIDGETS)) {
     assert.ok(w.allowedChartTypes.includes(w.defaultChartType), `${id}: default ${w.defaultChartType} fuera de allowed`);
+    if (w.usesHorizon) continue; // Alertas: usa horizonte (días), no período
     assert.ok(w.periods.includes(w.defaultPeriod), `${id}: defaultPeriod ${w.defaultPeriod} fuera de periods`);
   }
 });
 
 test('catálogo: IDs base soportan los 4 períodos; los _6m solo 6m', () => {
   for (const [id, w] of Object.entries(DASHBOARD_WIDGETS)) {
+    if (w.usesHorizon) continue; // Alertas: usa horizonte (días), no período
     if (id.endsWith('_6m')) {
       assert.deepEqual(w.periods, ['6m'], `${id} debería ser solo 6m`);
       assert.equal(w.defaultPeriod, '6m');

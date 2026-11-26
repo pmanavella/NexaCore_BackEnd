@@ -11,4 +11,10 @@ router.use(authenticate);
 router.get('/config', ctrl.obtenerConfiguracion.bind(ctrl));
 router.put('/config', ctrl.guardarConfiguracion.bind(ctrl));
 
+// Catálogo para "Crear gráfico personalizado" (filtrado por permisos del usuario).
+router.get('/catalogo', ctrl.obtenerCatalogo.bind(ctrl));
+
+// Datos de los mosaicos de Protocolos (el permiso de módulo se verifica en el service).
+router.get('/protocolos', ctrl.obtenerProtocolos.bind(ctrl));
+
 module.exports = router;

@@ -1,7 +1,8 @@
 const supabase = require('../../config/supabase');
 const organizacionService = require('../../organization/services/organizacionService');
-const { DASHBOARD_WIDGETS, WIDGET_PERIODS, CHART_TYPES } = require('../config/widgets');
+const { DASHBOARD_WIDGETS, WIDGET_PERIODS, CHART_TYPES, CATALOG_GROUPS } = require('../config/widgets');
 const indicadoresService = require('../../indicators/services/indicadoresService');
+const widgetsComunes = require('./widgetsComunes');
 const { UUID_REGEX } = indicadoresService;
 
 const DASHBOARD_NAME = 'Panel General';
@@ -56,6 +57,11 @@ class DashboardService {
         const instanceId = (typeof rawInstanceId === 'string' && rawInstanceId.trim())
           ? rawInstanceId.trim()
           : this._instanceIdLegacy(id);
+        // Mosaicos con horizonte (Alertas): sin `period`; llevan `alertTypes` y
+        // `horizonDays` (defaults del catálogo si faltan).
+        if (DASHBOARD_WIDGETS[id]?.usesHorizon) {
+          return { id, instanceId, size, chartType, ...widgetsComunes.normalizarParametrosAlerta(DASHBOARD_WIDGETS[id], entry) };
+        }
         // Mosaicos de indicador: `indicatorId` se conserva (y es obligatorio);
         // el resto de los mosaicos mantiene exactamente su estructura previa.
         if (DASHBOARD_WIDGETS[id]?.requiresIndicator) {
@@ -107,7 +113,13 @@ class DashboardService {
       } else if (entry.indicatorId !== undefined) {
         throw Object.assign(new Error(`"indicatorId" solo se admite en mosaicos de indicador (mosaico "${entry.id}").`), { status: 400 });
       }
-      if (entry.period !== undefined && entry.period !== null) {
+      if (widget.usesHorizon) {
+        // `period` no aplica a estos mosaicos: se ignora (no se persiste).
+        widgetsComunes.validarParametrosAlerta(widget, entry);
+      } else {
+        widgetsComunes.rechazarParametrosAlertaAjenos(entry);
+      }
+      if (!widget.usesHorizon && entry.period !== undefined && entry.period !== null) {
         const permitidos = widget.periods || WIDGET_PERIODS;
         if (!permitidos.includes(entry.period)) {
           throw Object.assign(
@@ -142,7 +154,9 @@ class DashboardService {
   _widgetPermitido(widgetId, allowedModules, userRole) {
     const widget = DASHBOARD_WIDGETS[widgetId];
     if (!widget) return false;
-    if (!allowedModules.includes(widget.module)) return false;
+    // `module: null` (Alertas): sin módulo único; los permisos se aplican por
+    // tipo de alerta al pedir los datos.
+    if (widget.module !== null && !allowedModules.includes(widget.module)) return false;
     if (widget.requiresModules && !widget.requiresModules.every(m => allowedModules.includes(m))) return false;
     if (widget.requiresRole && !widget.requiresRole.includes(userRole)) return false;
     return true;
@@ -182,6 +196,52 @@ class DashboardService {
       obtenerWidgetsPrevios(),
     ]);
     this._validarIndicadores(widgets, estadoPorId, widgetsPrevios);
+  }
+
+  // Catálogo para el panel "Crear gráfico personalizado": módulos (paso Módulo)
+  // con sus métricas, solo las que el usuario PUEDE agregar como mosaico nuevo.
+  // Excluye deprecados (CRM) y variantes legacy `_6m`. El mosaico de Alertas se
+  // ofrece si el usuario puede ver al menos un tipo, y solo con esos tipos.
+  async obtenerCatalogo(user) {
+    // Import diferido: alertasService arrastra dependencias de varios módulos.
+    const alertasService = require('../../alertas/services/alertasService');
+    const [allowedModules, tiposAlerta] = await Promise.all([
+      this._modulosHabilitados(user.id),
+      alertasService.tiposPermitidos(user),
+    ]);
+
+    const metrica = (id, w) => {
+      const base = {
+        id,
+        title: w.title,
+        periods: w.periods,
+        defaultPeriod: w.defaultPeriod,
+        chartTypes: w.allowedChartTypes,
+        defaultChartType: w.defaultChartType,
+        requiresIndicator: !!w.requiresIndicator,
+        sourceEndpoint: w.sourceEndpoint,
+      };
+      if (!w.usesHorizon) return base;
+      return {
+        ...base,
+        usesHorizon: true,
+        alertTypes: w.alertTypes.filter(t => tiposAlerta.includes(t)),
+        horizons: w.horizons,
+        defaultHorizon: w.defaultHorizon,
+      };
+    };
+
+    const modules = CATALOG_GROUPS.map(g => ({
+      module: g.key,
+      label: g.label,
+      metrics: Object.entries(DASHBOARD_WIDGETS)
+        .filter(([id, w]) => w.group === g.key && !w.deprecated && !id.endsWith('_6m'))
+        .filter(([id]) => this._widgetPermitido(id, allowedModules, user.role))
+        .filter(([, w]) => !w.usesHorizon || w.alertTypes.some(t => tiposAlerta.includes(t)))
+        .map(([id, w]) => metrica(id, w)),
+    })).filter(g => g.metrics.length > 0);
+
+    return { modules, allowedModules };
   }
 
   async obtenerConfiguracion(usuarioId, userRole) {
@@ -246,15 +306,26 @@ class DashboardService {
       );
     }
 
-    await this._verificarIndicadores(widgetsUnicos, async () => {
+    // Configuración previa: se lee una sola vez y solo si hace falta (mosaicos
+    // deprecados o de indicador).
+    let previaCache;
+    const obtenerWidgetsPrevios = async () => {
+      if (previaCache) return previaCache;
       const { data: previa, error: errPrevia } = await supabase
         .from('dashboard_configuraciones')
         .select('widgets')
         .eq('usuario_id', usuarioId)
         .maybeSingle();
       if (errPrevia) throw errPrevia;
-      return previa?.widgets || [];
-    });
+      previaCache = previa?.widgets || [];
+      return previaCache;
+    };
+
+    if (widgetsUnicos.some(w => DASHBOARD_WIDGETS[w.id]?.deprecated)) {
+      widgetsComunes.validarDeprecados(widgetsUnicos, this._normalizarWidgets(await obtenerWidgetsPrevios()));
+    }
+
+    await this._verificarIndicadores(widgetsUnicos, obtenerWidgetsPrevios);
 
     const { data: saved, error } = await supabase
       .from('dashboard_configuraciones')
